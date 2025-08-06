@@ -3,7 +3,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { FilesetResolver, ImageSegmenter, ImageSegmenterOptions } from '@mediapipe/tasks-vision';
 
 const COLOR_PALETTE = [
-  '#aa8866', '#debe99', '#241c11', '#4f1a00', '#9a3300',
+  '#aa8866', '#debe99', '#241c11', '#4f1a00', '#9a3300','#72442b'
 ];
 
 export default function HairColorChanger() {
@@ -13,31 +13,97 @@ export default function HairColorChanger() {
   const [selectedColor, setSelectedColor] = useState('#aa8866');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [edgeFadeRate, setEdgeFadeRate] = useState(1); // 0 to 1, where 1 is maximum fade
   const visionRef = useRef<any>(null);
   const hairSegmenterRef = useRef<any>(null);
   const lastProcessTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number>(0);
   const initializedRef = useRef(false);
 
-  // Memoize the applyHairColor function to prevent unnecessary recreations
+  // Enhanced applyHairColor with blending and edge fading
   const applyHairColor = useCallback((ctx: CanvasRenderingContext2D, mask: any) => {
     try {
       const { width, height } = ctx.canvas;
       const maskData = mask.getAsUint8Array();
       const imageData = ctx.getImageData(0, 0, width, height);
 
+      // Convert hex color to RGB
       const hex = selectedColor.replace('#', '');
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
+      const targetR = parseInt(hex.substring(0, 2), 16);
+      const targetG = parseInt(hex.substring(2, 4), 16);
+      const targetB = parseInt(hex.substring(4, 6), 16);
 
+      // Create a temporary canvas for edge detection
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = width;
+      tempCanvas.height = height;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
+
+      // Draw the mask to the temp canvas
+      const maskImageData = tempCtx.createImageData(width, height);
+      for (let i = 0; i < maskData.length; i++) {
+        const pixelIndex = i * 4;
+        maskImageData.data[pixelIndex] = maskData[i] * 255;
+        maskImageData.data[pixelIndex + 1] = maskData[i] * 255;
+        maskImageData.data[pixelIndex + 2] = maskData[i] * 255;
+        maskImageData.data[pixelIndex + 3] = 255;
+      }
+      tempCtx.putImageData(maskImageData, 0, 0);
+
+      // Apply blur to create edge fading
+      tempCtx.filter = `blur(${edgeFadeRate * 10}px)`;
+      tempCtx.drawImage(tempCanvas, 0, 0);
+      tempCtx.filter = 'none';
+
+      // Get the blurred mask data
+      const blurredMaskData = tempCtx.getImageData(0, 0, width, height).data;
+
+      // Apply color with blending and edge fading
       for (let i = 0; i < maskData.length; i++) {
         if (maskData[i] === 1) {
           const pixelIndex = i * 4;
-          const blendFactor = 0.4; // Increased blend factor for more visible color change
-          imageData.data[pixelIndex] = r * blendFactor + imageData.data[pixelIndex] * (1 - blendFactor);
-          imageData.data[pixelIndex + 1] = g * blendFactor + imageData.data[pixelIndex + 1] * (1 - blendFactor);
-          imageData.data[pixelIndex + 2] = b * blendFactor + imageData.data[pixelIndex + 2] * (1 - blendFactor);
+
+          // Get the original pixel color
+          const originalR = imageData.data[pixelIndex];
+          const originalG = imageData.data[pixelIndex + 1];
+          const originalB = imageData.data[pixelIndex + 2];
+
+          // Calculate the blend amount based on the blurred mask
+          const edgeFactor = blurredMaskData[pixelIndex] / 255;
+
+          // Dynamic blend factor based on original hair darkness
+          const originalBrightness = (originalR + originalG + originalB) / 3;
+          const darknessFactor = originalBrightness / 255; // 0 for black, 1 for white
+
+          // More color for darker hair, less for lighter
+          const blendFactor = 0.1 + (0.4 * (1 - darknessFactor));
+
+          // Apply color with edge fading
+          imageData.data[pixelIndex] =
+            targetR * blendFactor * edgeFactor +
+            originalR * (1 - blendFactor * edgeFactor);
+
+          imageData.data[pixelIndex + 1] =
+            targetG * blendFactor * edgeFactor +
+            originalG * (1 - blendFactor * edgeFactor);
+
+          imageData.data[pixelIndex + 2] =
+            targetB * blendFactor * edgeFactor +
+            originalB * (1 - blendFactor * edgeFactor);
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
+      // Apply a subtle noise filter to make it look more natural
+      const noiseOpacity = 0.03;
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        if (maskData[Math.floor(i/4)] === 1) {
+          const noise = (Math.random() - 0.5) * 40;
+          imageData.data[i] += noise * noiseOpacity;
+          imageData.data[i + 1] += noise * noiseOpacity;
+          imageData.data[i + 2] += noise * noiseOpacity;
         }
       }
 
@@ -45,7 +111,7 @@ export default function HairColorChanger() {
     } catch (error) {
       console.error('Error applying hair color:', error);
     }
-  }, [selectedColor]); // Recreate only when selectedColor changes
+  }, [selectedColor, edgeFadeRate]);
 
   // Process frame with rate limiting
   const processFrame = useCallback(async () => {
@@ -220,6 +286,23 @@ export default function HairColorChanger() {
           <div className="mt-2 w-full h-8 rounded-md"
                style={{ backgroundColor: selectedColor }} />
         </div>
+
+        {/* Edge Fade Rate Control */}
+        {/* <div className="w-full max-w-xs"> */}
+        {/*   <label className="block text-sm font-medium text-gray-700 mb-1"> */}
+        {/*     Edge Fade: {Math.round(edgeFadeRate * 100)}% */}
+        {/*   </label> */}
+        {/*   <input */}
+        {/*     type="range" */}
+        {/*     min="0" */}
+        {/*     max="1" */}
+        {/*     step="0.05" */}
+        {/*     value={edgeFadeRate} */}
+        {/*     onChange={(e) => setEdgeFadeRate(parseFloat(e.target.value))} */}
+        {/*     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" */}
+        {/*   /> */}
+        {/* </div> */}
+
         <span className="text-lg">Note: Works best in well-lit environments with clear hair visibility</span>
         <span className="">The model may take a moment to initialize</span>
       </div>
