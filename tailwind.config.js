@@ -8,7 +8,8 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Inter', 'sans-serif'], // or your preferred font
+                sans: ['Yekan Bakh', 'Yekan', 'Bakh'], // or your preferred font
+
             },
         },
     },

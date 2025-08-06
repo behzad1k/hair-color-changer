@@ -1,9 +1,9 @@
 'use client';
-import { useRef, useState, useEffect, useCallback } from 'react';
 import { FilesetResolver, ImageSegmenter, ImageSegmenterOptions } from '@mediapipe/tasks-vision';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const COLOR_PALETTE = [
-  '#aa8866', '#debe99', '#241c11', '#4f1a00', '#9a3300','#72442b'
+  '#9a3300', '#967259', '#a17383', '#0e1111', '#414a4c', '#aa8866', '#005582', '#634832'
 ];
 
 export default function HairColorChanger() {
@@ -21,9 +21,13 @@ export default function HairColorChanger() {
   const initializedRef = useRef(false);
 
   // Enhanced applyHairColor with blending and edge fading
+  // Updated applyHairColor with edge expansion and smoother fading
   const applyHairColor = useCallback((ctx: CanvasRenderingContext2D, mask: any) => {
     try {
-      const { width, height } = ctx.canvas;
+      const {
+        width,
+        height
+      } = ctx.canvas;
       const maskData = mask.getAsUint8Array();
       const imageData = ctx.getImageData(0, 0, width, height);
 
@@ -33,14 +37,14 @@ export default function HairColorChanger() {
       const targetG = parseInt(hex.substring(2, 4), 16);
       const targetB = parseInt(hex.substring(4, 6), 16);
 
-      // Create a temporary canvas for edge detection
+      // Create a temporary canvas for edge expansion and fading
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = width;
       tempCanvas.height = height;
       const tempCtx = tempCanvas.getContext('2d');
       if (!tempCtx) return;
 
-      // Draw the mask to the temp canvas
+      // Draw the original mask to the temp canvas
       const maskImageData = tempCtx.createImageData(width, height);
       for (let i = 0; i < maskData.length; i++) {
         const pixelIndex = i * 4;
@@ -51,33 +55,78 @@ export default function HairColorChanger() {
       }
       tempCtx.putImageData(maskImageData, 0, 0);
 
-      // Apply blur to create edge fading
-      tempCtx.filter = `blur(${edgeFadeRate * 10}px)`;
-      tempCtx.drawImage(tempCanvas, 0, 0);
-      tempCtx.filter = 'none';
+      // Create an expanded mask by dilating the original mask
+      const expandedCanvas = document.createElement('canvas');
+      expandedCanvas.width = width;
+      expandedCanvas.height = height;
+      const expandedCtx = expandedCanvas.getContext('2d');
+      if (!expandedCtx) return;
 
-      // Get the blurred mask data
-      const blurredMaskData = tempCtx.getImageData(0, 0, width, height).data;
+      // Draw the original mask
+      expandedCtx.putImageData(maskImageData, 0, 0);
+
+      // Apply dilation by drawing multiple times with offset
+      const expandPixels = .5; // Average of 4-6 pixels expansion
+      expandedCtx.globalCompositeOperation = 'lighten';
+      expandedCtx.filter = 'blur(1px)'; // Soften the expansion
+
+      // Draw expanded edges in all directions
+      for (let i = 1; i <= expandPixels; i++) {
+        expandedCtx.drawImage(tempCanvas, -i, 0); // left
+        expandedCtx.drawImage(tempCanvas, i, 0);  // right
+        expandedCtx.drawImage(tempCanvas, 0, -i); // top
+        expandedCtx.drawImage(tempCanvas, 0, i);  // bottom
+        // Diagonals for more complete expansion
+        expandedCtx.drawImage(tempCanvas, -i, -i);
+        expandedCtx.drawImage(tempCanvas, i, -i);
+        expandedCtx.drawImage(tempCanvas, -i, i);
+        expandedCtx.drawImage(tempCanvas, i, i);
+      }
+
+      expandedCtx.filter = 'none';
+      expandedCtx.globalCompositeOperation = 'source-over';
+
+      // Create gradient mask for fading
+      const gradientCanvas = document.createElement('canvas');
+      gradientCanvas.width = width;
+      gradientCanvas.height = height;
+      const gradientCtx = gradientCanvas.getContext('2d');
+      if (!gradientCtx) return;
+
+      // Get the expanded mask data
+      const expandedData = expandedCtx.getImageData(0, 0, width, height);
+      gradientCtx.putImageData(expandedData, 0, 0);
+
+      // Apply blur to create smooth fading
+      const fadeStartDistance = 5; // Start fading 3-4 pixels before the edge
+      const totalFadeDistance = expandPixels + fadeStartDistance;
+      gradientCtx.filter = `blur(${totalFadeDistance}px)`;
+      gradientCtx.drawImage(gradientCanvas, 0, 0);
+      gradientCtx.filter = 'none';
+
+      // Get the final mask with smooth fading
+      const finalMaskData = gradientCtx.getImageData(0, 0, width, height).data;
 
       // Apply color with blending and edge fading
       for (let i = 0; i < maskData.length; i++) {
-        if (maskData[i] === 1) {
-          const pixelIndex = i * 4;
+        const pixelIndex = i * 4;
+        const maskValue = finalMaskData[pixelIndex] / 255; // Fading mask value (0 to 1)
 
+        if (maskValue > 0) {
           // Get the original pixel color
           const originalR = imageData.data[pixelIndex];
           const originalG = imageData.data[pixelIndex + 1];
           const originalB = imageData.data[pixelIndex + 2];
 
-          // Calculate the blend amount based on the blurred mask
-          const edgeFactor = blurredMaskData[pixelIndex] / 255;
+          // Calculate the blend amount based on the original mask and fading
+          const originalMaskValue = maskData[i]; // Original mask (0 or 1)
+          const edgeFactor = originalMaskValue === 1 ? 1 : maskValue; // Full strength inside, fading at edges
 
           // Dynamic blend factor based on original hair darkness
           const originalBrightness = (originalR + originalG + originalB) / 3;
           const darknessFactor = originalBrightness / 255; // 0 for black, 1 for white
-
           // More color for darker hair, less for lighter
-          const blendFactor = 0.1 + (0.4 * (1 - darknessFactor));
+          const blendFactor = 0.35;
 
           // Apply color with edge fading
           imageData.data[pixelIndex] =
@@ -99,11 +148,13 @@ export default function HairColorChanger() {
       // Apply a subtle noise filter to make it look more natural
       const noiseOpacity = 0.03;
       for (let i = 0; i < imageData.data.length; i += 4) {
-        if (maskData[Math.floor(i/4)] === 1) {
+        const pixelIndex = Math.floor(i / 4);
+        const maskValue = finalMaskData[i] / 255;
+        if (maskValue > 0) {
           const noise = (Math.random() - 0.5) * 40;
-          imageData.data[i] += noise * noiseOpacity;
-          imageData.data[i + 1] += noise * noiseOpacity;
-          imageData.data[i + 2] += noise * noiseOpacity;
+          imageData.data[i] += noise * noiseOpacity * maskValue;
+          imageData.data[i + 1] += noise * noiseOpacity * maskValue;
+          imageData.data[i + 2] += noise * noiseOpacity * maskValue;
         }
       }
 
@@ -112,7 +163,6 @@ export default function HairColorChanger() {
       console.error('Error applying hair color:', error);
     }
   }, [selectedColor, edgeFadeRate]);
-
   // Process frame with rate limiting
   const processFrame = useCallback(async () => {
     if (!isCameraOn || !hairSegmenterRef.current || isProcessing) {
@@ -155,7 +205,7 @@ export default function HairColorChanger() {
         }
       }
     } catch (err) {
-      console.error("Error processing frame:", err);
+      console.error('Error processing frame:', err);
     } finally {
       setIsProcessing(false);
       animationFrameRef.current = requestAnimationFrame(processFrame);
@@ -171,14 +221,14 @@ export default function HairColorChanger() {
       try {
         // Initialize MediaPipe
         const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.4/wasm"
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.4/wasm'
         );
         visionRef.current = vision;
 
         const options: ImageSegmenterOptions = {
           baseOptions: {
-            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/hair_segmenter/float32/latest/hair_segmenter.tflite",
-            delegate: "CPU"
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/hair_segmenter/float32/latest/hair_segmenter.tflite',
+            delegate: 'CPU'
           },
           runningMode: 'VIDEO',
           outputCategoryMask: true,
@@ -190,8 +240,8 @@ export default function HairColorChanger() {
         // Start camera after initialization
         await startCamera();
       } catch (err) {
-        console.error("Initialization error:", err);
-        setError("Failed to initialize. Please refresh the page and allow camera access.");
+        console.error('Initialization error:', err);
+        setError('Failed to initialize. Please refresh the page and allow camera access.');
       }
     };
 
@@ -237,8 +287,8 @@ export default function HairColorChanger() {
         setIsCameraOn(true);
       }
     } catch (err) {
-      console.error("Error accessing camera:", err);
-      setError("Could not access camera. Please ensure you've granted camera permissions.");
+      console.error('Error accessing camera:', err);
+      setError('Could not access camera. Please ensure you\'ve granted camera permissions.');
     }
   };
 
@@ -256,7 +306,11 @@ export default function HairColorChanger() {
           className={`rounded-lg border-4 ${isCameraOn ? 'border-green-500' : 'border-gray-300'}`}
           playsInline
           muted
-          style={{ display: 'none', width: '640px', height: '480px' }}
+          style={{
+            display: 'none',
+            width: '640px',
+            height: '480px'
+          }}
         />
         <canvas
           ref={canvasRef}
@@ -265,17 +319,17 @@ export default function HairColorChanger() {
       </div>
 
       <div className="flex flex-col items-center gap-6 absolute bottom-0" style={{ bottom: 30 }}>
-        <div className="flex flex-col items-center">
-          <h2 className="text-xl font-semibold mb-2">Choose Hair Color</h2>
-          <div className="flex gap-4 w-full gap-2">
+        <div className="flex flex-col items-center gap-2" style={{ gap: 10 }}>
+          <span className="text-lg mb-2">رنگ مورد علاقه خود را انتخاب کنید</span>
+          <div className="flex gap-4 w-full gap-2" style={{ gap: 4 }}>
             {COLOR_PALETTE.map((color) => (
               <span
                 key={color}
                 onClick={() => setSelectedColor(color)}
                 style={{
                   backgroundColor: color,
-                  width: 50,
-                  height: 50,
+                  width: 40,
+                  height: 40,
                   borderRadius: 150,
                   cursor: 'pointer',
                   border: selectedColor === color ? '2px solid white' : 'none'
@@ -284,27 +338,10 @@ export default function HairColorChanger() {
             ))}
           </div>
           <div className="mt-2 w-full h-8 rounded-md"
-               style={{ backgroundColor: selectedColor }} />
+               style={{ backgroundColor: selectedColor }}/>
+          <span className="text-sm">برای نمایش مطلوب در محیط های با نور مناسب قرار بگیرید</span>
         </div>
 
-        {/* Edge Fade Rate Control */}
-        {/* <div className="w-full max-w-xs"> */}
-        {/*   <label className="block text-sm font-medium text-gray-700 mb-1"> */}
-        {/*     Edge Fade: {Math.round(edgeFadeRate * 100)}% */}
-        {/*   </label> */}
-        {/*   <input */}
-        {/*     type="range" */}
-        {/*     min="0" */}
-        {/*     max="1" */}
-        {/*     step="0.05" */}
-        {/*     value={edgeFadeRate} */}
-        {/*     onChange={(e) => setEdgeFadeRate(parseFloat(e.target.value))} */}
-        {/*     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" */}
-        {/*   /> */}
-        {/* </div> */}
-
-        <span className="text-lg">Note: Works best in well-lit environments with clear hair visibility</span>
-        <span className="">The model may take a moment to initialize</span>
       </div>
     </div>
   );
