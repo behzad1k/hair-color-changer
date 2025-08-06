@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+}
+*{
+    padding: 0;
+    box-sizing: border-box;
+    margin: 0;
+}
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+          to bottom,
+          transparent,
+          rgb(var(--background-end-rgb)),
+          rgb(var(--background-start-rgb)))
+}
+.color-swatch {
+    width: 2.5rem; /* equivalent to w-10 */
+    height: 2.5rem; /* equivalent to h-10 */
+    border-radius: 9999px; /* equivalent to rounded-full */
+    border-width: 2px; /* equivalent to border-2 */
+    cursor: pointer;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms; /* equivalent to duration-200 */
+}
+
+.color-swatch:hover {
+    transform: scale(1.1); /* equivalent to scale-110 */
+    --tw-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --tw-shadow-colored: 0 4px 6px -1px var(--tw-shadow-color), 0 2px 4px -2px var(--tw-shadow-color);
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+.selected-swatch {
+    border-color: white;
+    --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
