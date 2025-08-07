@@ -1,12 +1,16 @@
 'use client';
 import { FilesetResolver, ImageSegmenter, ImageSegmenterOptions } from '@mediapipe/tasks-vision';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useWindowSize } from '@react-hook/window-size';
 
 const COLOR_PALETTE = [
   '#9a3300', '#967259', '#a17383', '#0e1111', '#414a4c', '#aa8866', '#005582', '#634832'
 ];
 
 export default function HairColorChanger() {
+  const [width, height] = useWindowSize();
+  const isMobile = width < 768;
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
@@ -14,14 +18,19 @@ export default function HairColorChanger() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [edgeFadeRate, setEdgeFadeRate] = useState(1); // 0 to 1, where 1 is maximum fade
+  const [isLoading, setIsLoading] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(true);
+  const [showColorPalette, setShowColorPalette] = useState(true);
   const visionRef = useRef<any>(null);
   const hairSegmenterRef = useRef<any>(null);
   const lastProcessTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number>(0);
   const initializedRef = useRef(false);
 
+  const toggleColorPalette = () => {
+    setShowColorPalette(!showColorPalette);
+  };
   // Enhanced applyHairColor with blending and edge fading
-  // Updated applyHairColor with edge expansion and smoother fading
   const applyHairColor = useCallback((ctx: CanvasRenderingContext2D, mask: any) => {
     try {
       const {
@@ -236,7 +245,7 @@ export default function HairColorChanger() {
         };
 
         hairSegmenterRef.current = await ImageSegmenter.createFromOptions(vision, options);
-
+        setIsLoading(false)
         // Start camera after initialization
         await startCamera();
       } catch (err) {
@@ -293,56 +302,192 @@ export default function HairColorChanger() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
+    <div className="relative flex flex-col items-center justify-start min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 overflow-hidden">
+      {/* Loading overlay */}
+      <AnimatePresence>
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900"
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+              className="w-16 h-16 border-4 border-t-transparent border-blue-500 rounded-full mb-4"
+            />
+            <motion.p
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-white text-lg text-center px-4"
+            >...در حال بارگزاری</motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="relative mb-6 h-screen w-screen">
+      {/* Error message */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="fixed top-4 left-4 right-4 mx-auto max-w-md bg-red-500/90 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-lg z-40 flex items-center gap-3"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="text-sm">{error}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <motion.header
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="w-full max-w-4xl py-4 z-10"
+      >
+        <h1 className="text-2xl font-sans md:text-4xl text-center text-white">رنگ مو مجازی</h1>
+      </motion.header>
+
+      {/* Camera preview area - responsive sizing */}
+      <div className={`relative h-full w-full ${isMobile ? 'aspect-[9/16]' : 'aspect-video'}  rounded-xl md:rounded-2xl overflow-hidden bg-gray-800 shadow-xl`}>
         <video
           ref={videoRef}
-          className={`rounded-lg border-4 ${isCameraOn ? 'border-green-500' : 'border-gray-300'}`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isCameraOn ? 'opacity-0' : 'opacity-20'}`}
           playsInline
           muted
-          style={{
-            display: 'none',
-            width: '640px',
-            height: '480px'
-          }}
         />
+
         <canvas
           ref={canvasRef}
-          className={`absolute top-0 left-0 rounded-lg ${isCameraOn ? 'block' : 'hidden'} h-screen w-screen`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isCameraOn ? 'opacity-100' : 'opacity-0'}`}
         />
-      </div>
 
-      <div className="flex flex-col items-center gap-6 absolute bottom-0" style={{ bottom: 30 }}>
-        <div className="flex flex-col items-center gap-2" style={{ gap: 10 }}>
-          <span className="text-lg mb-2">رنگ مورد علاقه خود را انتخاب کنید</span>
-          <div className="flex gap-4 w-full gap-2" style={{ gap: 4 }}>
-            {COLOR_PALETTE.map((color) => (
-              <span
-                key={color}
-                onClick={() => setSelectedColor(color)}
-                style={{
-                  backgroundColor: color,
-                  width: 40,
-                  height: 40,
-                  borderRadius: 150,
-                  cursor: 'pointer',
-                  border: selectedColor === color ? '2px solid white' : 'none'
-                }}
-              />
-            ))}
-          </div>
-          <div className="mt-2 w-full h-8 rounded-md"
-               style={{ backgroundColor: selectedColor }}/>
-          <span className="text-sm">برای نمایش مطلوب در محیط های با نور مناسب قرار بگیرید</span>
+        {/* Camera status indicator */}
+        <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+          <motion.div
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ repeat: Infinity, duration: 2 }}
+            className={`w-2 h-2 md:w-3 md:h-3 rounded-full ${isCameraOn ? 'bg-green-400 shadow-green-400/50' : 'bg-gray-500'} shadow-lg`}
+          />
+          <span className="text-white text-xs md:text-sm font-medium">
+            {isCameraOn ? 'Active' : 'Offline'}
+          </span>
         </div>
 
+        {/* Instructions overlay */}
+        <AnimatePresence>
+          {showInstructions && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-4 md:p-6 z-20"
+              onClick={() => setShowInstructions(false)}
+            >
+              <motion.div
+                initial={{ y: 20 }}
+                animate={{ y: 0 }}
+                className="bg-gray-800/90 border border-gray-700 rounded-xl p-4 md:p-6 max-w-md w-full mx-4 text-center"
+              >
+                <h3 className="text-xl md:text-4xl text-white mb-3 md:mb-4">نحوه استفاده</h3>
+                <ul className="space-y-2 md:space-y-3 md:text-base mb-4 md:mb-6">
+                  <li className="flex flex-row-reverse gap-3 mt-4">
+                    <span className="text-blue-500">.۱</span> اجازه دسترسی به دوربین را تایید کنید
+                  </li>
+                  <li className="flex flex-row-reverse gap-3 mt-4">
+                    <span className="text-blue-500">.۲</span> رنگ مو مد نظر خود را انتخاب کنید
+                  </li>
+                  <li className="flex flex-row-reverse gap-3 mt-4">
+                    <span className="text-blue-500">.۳</span>در محیطی با نور مناسب قرار گیرید
+                  </li>
+                </ul>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 md:px-6 md:py-2 rounded-lg font-medium transition-colors text-sm md:text-base mt-4"
+                >
+                  متوجه شدم!
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+
+      {/* Mobile controls toggle */}
+      {/* {isMobile && ( */}
+      {/*   <motion.button */}
+      {/*     onClick={toggleColorPalette} */}
+      {/*     whileTap={{ scale: 0.95 }} */}
+      {/*     className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-30 bg-blue-600 text-white rounded-full p-3 shadow-xl" */}
+      {/*   > */}
+      {/*     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"> */}
+      {/*       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /> */}
+      {/*     </svg> */}
+      {/*   </motion.button> */}
+      {/* )} */}
+
+      {/* Controls panel - responsive positioning */}
+      <AnimatePresence>
+        {(showColorPalette || !isMobile) && (
+          <motion.div
+            initial={{ y: isMobile ? 50 : 0, opacity: isMobile ? 0 : 1 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: isMobile ? 50 : 0, opacity: isMobile ? 0 : 1 }}
+            transition={{ type: 'spring', damping: 20 }}
+            className={`${isMobile ? 'fixed bottom-0 left-0 right-0' : 'relative mt-6'} w-full max-w-2xl bg-gray-800/90 backdrop-blur-md rounded-t-2xl ${isMobile ? 'rounded-b-none' : 'rounded-2xl'} md:p-6 shadow-lg border border-gray-700 z-20 p-4 `}
+          >
+            <div className="flex flex-col items-center gap-4 md:gap-6">
+              <div className="text-center">
+                <h2 className="text-xl md:text-2xl text-white mb-1 text-right">!رنگ مو های جدید امتخان کنید</h2>
+                <p className="text-gray-400 text-sm md:text-base">یکی از رتگ های زیر را برای شروع انتخاب کنید</p>
+              </div>
+
+              {/* Color palette - responsive sizing */}
+              <div className="w-full pb-5">
+                <div className="flex justify-center gap-2 md:gap-3 px-1 flex-wrap " style={{ minWidth: 'min-content' }}>
+                  {COLOR_PALETTE.map((color) => (
+                    <motion.div
+                      key={color}
+                      whileHover={{ scale: 1.1, y: -5 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setSelectedColor(color)}
+                      className={`w-8 h-8 md:w-10 md:h-10 rounded-full cursor-pointer shadow-lg transition-all duration-200 ${selectedColor === color ? 'ring-3 md:ring-4 ring-white scale-110' : 'ring-1 md:ring-2 ring-gray-600'}`}
+                      style={{ backgroundColor: color }}
+                      title={`Color: ${color}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Tips */}
+              {/* <div className="text-center text-gray-400 text-xs md:text-sm mt-1 md:mt-2"> */}
+              {/*   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"> */}
+              {/*     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /> */}
+              {/*   </svg> */}
+              {/*   For best results, position yourself in good lighting */}
+              {/* </div> */}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Footer */}
+      <motion.footer
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        className={`${isMobile ? 'hidden' : 'block'} mt-4 md:mt-6 text-gray-500 text-xs md:text-sm text-center`}
+      >
+        <p>Hair Color Changer App • Powered by AI • v1.0.0</p>
+      </motion.footer>
     </div>
   );
+
 }

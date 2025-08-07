@@ -1,21 +1,15 @@
-/** @type {import('tailwindcss').Config} */
 module.exports = {
-    content: [
-        './app/**/*.{js,ts,jsx,tsx,mdx}',
-        './components/**/*.{js,ts,jsx,tsx,mdx}',
-        './src/**/*.{js,ts,jsx,tsx,mdx}', // Add this line
-    ],
+    purge: [],
+    darkMode: false, // or 'media' or 'class'
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Yekan Bakh', 'Yekan', 'Bakh'], // or your preferred font
-
-            },
+                sans: ['Yekan Bakh', 'sans-serif']
+            }
         },
     },
+    variants: {
+        extend: {},
+    },
     plugins: [],
-    corePlugins: {
-        // Ensure all core plugins are enabled
-        preflight: true,
-    }
 }
