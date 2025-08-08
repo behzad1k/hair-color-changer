@@ -75,7 +75,7 @@ export default function HairColorChanger() {
       expandedCtx.putImageData(maskImageData, 0, 0);
 
       // Apply dilation by drawing multiple times with offset
-      const expandPixels = .5; // Average of 4-6 pixels expansion
+      const expandPixels = 1; // Average of 4-6 pixels expansion
       expandedCtx.globalCompositeOperation = 'lighten';
       expandedCtx.filter = 'blur(1px)'; // Soften the expansion
 
@@ -135,7 +135,7 @@ export default function HairColorChanger() {
           const originalBrightness = (originalR + originalG + originalB) / 3;
           const darknessFactor = originalBrightness / 255; // 0 for black, 1 for white
           // More color for darker hair, less for lighter
-          const blendFactor = 0.35;
+          const blendFactor = 0.27;
 
           // Apply color with edge fading
           imageData.data[pixelIndex] =
