@@ -923,15 +923,15 @@ export default function HairColorChanger() {
                   <h3 className={`text-white mb-3 md:mb-4 ${isMobile ? 'text-lg' : 'text-xl md:text-2xl'}`}>نحوه استفاده</h3>
                   <ul className="space-y-2 md:space-y-3 text-sm md:text-base mb-4 md:mb-6 text-gray-200">
                     <li className="flex flex-row-reverse gap-3 mt-4 items-center">
-                      <span className="text-purple-400 font-bold">.۱</span>
+                      <span className="text-purple-400">.۱</span>
                       <span>اجازه دسترسی به دوربین را تایید کنید</span>
                     </li>
                     <li className="flex flex-row-reverse gap-3 mt-4 items-center">
-                      <span className="text-purple-400 font-bold">.۲</span>
+                      <span className="text-purple-400">.۲</span>
                       <span>رنگ پایه یا هایلایت مورد نظر را انتخاب کنید</span>
                     </li>
                     <li className="flex flex-row-reverse gap-3 mt-4 items-center">
-                      <span className="text-purple-400 font-bold">.۳</span>
+                      <span className="text-purple-400">.۳</span>
                       <span>در محیطی با نور مناسب قرار گیرید</span>
                     </li>
                     <li className="flex flex-row-reverse gap-3 mt-4 items-center text-rose-500">
