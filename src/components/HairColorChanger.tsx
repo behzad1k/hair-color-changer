@@ -7,31 +7,31 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const COLOR_PALETTE = [
   {
     color: '#2C1810',
-    opacity: 0.7
+    opacity: 0.5
   }, // Dark Brown
   {
     color: '#3D2817',
-    opacity: 0.8
+    opacity: 0.4
   }, // Medium Brown
   {
     color: '#654321',
-    opacity: 0.6
+    opacity: 0.3
   }, // Chocolate Brown
   {
     color: '#8B4513',
-    opacity: 0.5
+    opacity: 0.3
   }, // Saddle Brown
   {
     color: '#A0522D',
-    opacity: 0.4
+    opacity: 0.3
   }, // Sienna
   {
     color: '#CD853F',
-    opacity: 0.3
+    opacity: 0.2
   }, // Peru
   {
     color: '#DEB887',
-    opacity: 0.3
+    opacity: 0.2
   }, // Burlywood
   {
     color: '#F4A460',
