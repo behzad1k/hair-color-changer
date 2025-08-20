@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const COLOR_PALETTE = [
   {
     color: '#2C1810',
-    opacity: 0.5
+    opacity: 0.4
   }, // Dark Brown
   {
     color: '#3D2817',
