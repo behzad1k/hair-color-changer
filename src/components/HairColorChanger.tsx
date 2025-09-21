@@ -4,39 +4,227 @@ import { useWindowSize } from '@react-hook/window-size';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+const COLOR_CATEGORIES = [
+  {
+    slug: 'red',
+    title: 'قرمز و شرابی',
+    color: '#6f3140'
+  },
+  {
+    slug: 'brown',
+    title: 'قهوه ای مدرن',
+    color: '#2d2823'
+  },
+  {
+    slug: 'natural',
+    title: 'طبیعی',
+    color: '#28282e'
+  },
+  {
+    slug: 'quartz',
+    title: 'کوارتز',
+    color: '#281c1e'
+  },
+  {
+    slug: 'variation',
+    title: 'واریسیون',
+    color: '#a3a2a8'
+  },
+];
+
 const COLOR_PALETTE = [
   {
-    color: '#2C1810',
+    category: 'red',
+    title: 'شرابی تیره',
+    color: '#231121',
+    opacity: 0.5,
+  },
+  {
+    category: 'red',
+    title: 'شرابی',
+    color: '#2c1c27',
+    opacity: 0.5
+  },
+  {
+    category: 'red',
+    title: 'شرابی روشن',
+    color: '#3c1e3c',
+    opacity: 0.4,
+  },
+  {
+    category: 'red',
+    title: 'قرمز آلبالویی',
+    color: '#6f3140',
     opacity: 0.4
-  }, // Dark Brown
+  },
   {
-    color: '#3D2817',
+    category: 'red',
+    title: 'قرمز آلبالویی روشن',
+    color: '#7c4650',
+    opacity: 0.3,
+  },
+  {
+    category: 'red',
+    title: 'قرمز آتشین',
+    color: '#42050b',
     opacity: 0.4
-  }, // Medium Brown
+  },
   {
-    color: '#654321',
+    category: 'red',
+    title: 'قرمز آتشین روشن',
+    color: '#50141e',
+    opacity: 0.4
+  },
+  {
+    category: 'brown',
+    title: 'شکلات تلخ',
+    color: '#2d2823',
+    opacity: 0.5,
+  },
+  {
+    category: 'brown',
+    title: 'نوتلا',
+    color: '#5a463f',
+    opacity: 0.4
+  },
+  {
+    category: 'brown',
+    title: 'کافه لاته',
+    color: '#a6826f',
+    opacity: 0.3,
+  },
+  {
+    category: 'brown',
+    title: 'موکا',
+    color: '#463225',
+    opacity: 0.5
+  },
+  {
+    category: 'brown',
+    title: 'آیس موکا',
+    color: '#b9a07d',
+    opacity: 0.3,
+  },
+  {
+    category: 'brown',
+    title: 'هات چاکلت',
+    color: '#321e14',
+    opacity: 0.4
+  },
+  {
+    category: 'brown',
+    title: 'مینک',
+    color: '#644b41',
+    opacity: 0.4
+  },
+  {
+    category: 'brown',
+    title: 'شکلات سفید',
+    color: '#debeaa',
     opacity: 0.3
-  }, // Chocolate Brown
+  },
   {
-    color: '#8B4513',
+    category: 'natural',
+    title: 'مشکی',
+    color: '#000000',
+    opacity: 0.5
+  },
+  {
+    category: 'natural',
+    title: 'قهوه ای تیره',
+    color: '#28282e',
+    opacity: 0.5
+  },
+  {
+    category: 'natural',
+    title: 'قهوه ای خیلی تیره',
+    color: '#0d0a15',
+    opacity: 0.5
+  },
+  {
+    category: 'natural',
+    title: 'قهوه ای',
+    color: '#463a38',
+    opacity: 0.5
+  },
+  {
+    category: 'natural',
+    title: 'قهوه ای روشن',
+    color: '#493c3c',
+    opacity: 0.5
+  },
+  {
+    category: 'natural',
+    title: 'بلوند تیره',
+    color: '#4f3b32',
+    opacity: 0.5
+  },
+  {
+    category: 'natural',
+    title: 'بلوند',
+    color: '#644632',
+    opacity: 0.5
+  },
+  {
+    category: 'natural',
+    title: 'بلوند روشن',
+    color: '#7d583b',
+    opacity: 0.5
+  },
+  {
+    category: 'natural',
+    title: 'بلوند خیلی روشن',
+    color: '#86643a',
+    opacity: 0.4
+  },
+  {
+    category: 'natural',
+    title: 'بلوند فوق روشن',
+    color: '#d8be91',
+    opacity: 0.4
+  },
+  {
+    category: 'quartz',
+    title: 'کوارتز دودی',
+    color: '#281c1e',
+    opacity: 0.5
+  },
+  {
+    category: 'quartz',
+    title: 'کوارتز دودی روشن',
+    color: '#867072',
     opacity: 0.3
-  }, // Saddle Brown
+  },
   {
-    color: '#A0522D',
+    category: 'quartz',
+    title: 'کوارتز دودی خیلی روشن',
+    color: '#b09793',
     opacity: 0.3
-  }, // Sienna
+  },
   {
-    color: '#CD853F',
-    opacity: 0.2
-  }, // Peru
+    category: 'quartz',
+    title: 'کوارتز صورتی',
+    color: '#b68e8e',
+    opacity: 0.3
+  },
   {
-    color: '#DEB887',
-    opacity: 0.2
-  }, // Burlywood
+    category: 'quartz',
+    title: 'کوارتز صورتی روشن',
+    color: '#c6a0a0',
+    opacity: 0.3
+  },
   {
-    color: '#F4A460',
-    opacity: 0.2
-  }  // Sandy Brown
+    category: 'variation',
+    title: 'واریاسیون نقره ای',
+    color: '#a3a2a8',
+    opacity: 0.3
+  },
+  {
+    category: 'variation',
+    title: 'واریاسیون سبز',
+    color: '#3c5055',
+    opacity: 0.4
+  },
 ];
 
 const HIGHLIGHT_COLORS = [
@@ -93,6 +281,7 @@ export default function HairColorChanger() {
   const [showColorPalette, setShowColorPalette] = useState(false); // Hidden by default
   const [hasShownInstructions, setHasShownInstructions] = useState(false);
   const [activeTab, setActiveTab] = useState<'color' | 'highlights'>('color');
+  const [colorCat, setColorCat] = useState(null);
 
   const visionRef = useRef<any>(null);
   const hairSegmenterRef = useRef<any>(null);
@@ -1278,39 +1467,86 @@ export default function HairColorChanger() {
                   }}
                   className="w-full flex flex-col items-center gap-3"
                 >
-                  <div className="text-center">
-                    <h2 className={`text-white mb-1 text-center ${isMobile ? 'text-base' : 'text-lg'}`}>رنگ پایه مو</h2>
-                    <p className={`text-gray-400 ${isMobile ? 'text-xs' : 'text-sm'}`}>یک رنگ پایه برای موهای خود انتخاب کنید</p>
-                  </div>
+                  {colorCat ?
+                    <>
+                      <div className="text-center">
+                        <h2 className={`text-white mb-1 text-center ${isMobile ? 'text-base' : 'text-lg'}`}>رنگ پایه مو</h2>
+                        <p className={`text-gray-400 ${isMobile ? 'text-xs' : 'text-sm'}`}>یک رنگ پایه برای موهای خود انتخاب کنید</p>
+                        <button className={`text-white-800 ${isMobile ? 'text-xs' : 'text-sm'}`} onClick={() => setColorCat(null)}>« بازگشت‌</button>
+                      </div>
 
-                  {/* Base color palette - Compact grid */}
-                  <div className="w-full">
-                    <div className={`grid ${isMobile ? 'grid-cols-4' : isTablet ? 'grid-cols-6' : 'grid-cols-8'} gap-2 justify-center max-w-lg mx-auto px-8`}>
-                      {COLOR_PALETTE.map((colorObj, index) => (
-                        <motion.div
-                          key={index}
-                          whileHover={{
-                            scale: 1.1,
-                            y: -3
-                          }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => setSelectedColor(colorObj)}
-                          className={`${isMobile ? 'w-8 h-8' : isTablet ? 'w-9 h-9' : 'w-10 h-10'} rounded-full cursor-pointer shadow-lg transition-all duration-200 relative ${
-                            selectedColor.color === colorObj.color
-                              ? 'ring-2 md:ring-3 ring-purple-400 scale-110 shadow-purple-400/50'
-                              : 'ring-1 ring-gray-600 hover:ring-purple-300'
-                          }`}
-                          style={{ backgroundColor: colorObj.color }}
-                          title={`Color: ${colorObj.color} (${Math.round(colorObj.opacity * 100)}% opacity)`}
-                        >
-                          {/* Opacity indicator */}
-                          <div className={`absolute -bottom-0.5 -right-0.5 bg-gray-900 text-white text-xs rounded-full ${isMobile ? 'w-4 h-4' : 'w-5 h-5'} flex items-center justify-center border border-gray-600`}>
-                            {Math.round(colorObj.opacity * 100)}
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
+                      {/* Base color palette - Compact grid */}
+                      <div className="w-full">
+                        <div className={`flex ${isMobile ? 'grid-cols-4' : isTablet ? 'grid-cols-6' : 'grid-cols-8'} gap-8 justify-center flex-wrap max-w-lg mx-auto px-8`}>
+                          {COLOR_PALETTE.filter(e => e.category == (colorCat as any)?.slug).map((colorObj, index) => (
+                            <div className="flex flex-col gap-2 items-center min-w-16">
+                              <motion.div
+                                key={index}
+                                whileHover={{
+                                  scale: 1.1,
+                                  y: -3
+                                }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setSelectedColor(colorObj)}
+                                className={`${isMobile ? 'w-8 h-8' : isTablet ? 'w-9 h-9' : 'w-10 h-10'} rounded-full cursor-pointer shadow-lg transition-all duration-200 relative ${
+                                  selectedColor.color === colorObj.color
+                                    ? 'ring-2 md:ring-3 ring-purple-400 scale-110 shadow-purple-400/50'
+                                    : 'ring-1 ring-gray-600 hover:ring-purple-300'
+                                }`}
+                                style={{ backgroundColor: colorObj.color }}
+                                title={`Color: ${colorObj.color} (${Math.round(colorObj.opacity * 100)}% opacity)`}
+                              >
+                                {/* Opacity indicator */}
+                                <div className={`absolute -bottom-0.5 -right-0.5 bg-gray-900 text-white text-xs rounded-full ${isMobile ? 'w-4 h-4' : 'w-5 h-5'} flex items-center justify-center border border-gray-600`}>
+                                  {Math.round(colorObj.opacity * 100)}
+                                </div>
+                              </motion.div>
+                              <span className="text-center" style={{ fontSize: '10px' }}>{colorObj.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                    :
+                    <>
+                      <div className="text-center">
+                        <h2 className={`text-white mb-1 text-center ${isMobile ? 'text-base' : 'text-lg'}`}>دسته بندی رنگ ها</h2>
+                        <p className={`text-gray-400 ${isMobile ? 'text-xs' : 'text-sm'}`}>دسته بندی مورد نظر خود را انتخاب کنید</p>
+                      </div>
+
+                      {/* Base color palette - Compact grid */}
+                      <div className="w-full">
+                        <div className={`flex ${isMobile ? 'grid-cols-4' : isTablet ? 'grid-cols-6' : 'grid-cols-8'} gap-2 justify-between max-w-lg mx-auto px-8`}>
+                          {COLOR_CATEGORIES.map((colorObj, index) => (
+                            <div className="flex flex-col gap-2 items-center">
+                              <motion.div
+                                key={index}
+                                whileHover={{
+                                  scale: 1.1,
+                                  y: -3
+                                }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setColorCat(colorObj as any)}
+                                className={`${isMobile ? 'w-9 h-9' : isTablet ? 'w-9 h-9' : 'w-10 h-10'} flex flex-col items-center rounded-full cursor-pointer shadow-lg transition-all duration-200 relative ${
+                                  selectedColor.color === colorObj.color
+                                    ? 'ring-2 md:ring-3 ring-purple-400 scale-110 shadow-purple-400/50'
+                                    : 'ring-1 ring-gray-600 hover:ring-purple-300'
+                                }`}
+                                style={{ backgroundColor: colorObj.color }}
+                                title={`Color: ${colorObj.color}`}
+                              >
+                                {/* Opacity indicator */}
+                                {/* <div className={`absolute -bottom-0.5 -right-0.5 bg-gray-900 text-white text-xs rounded-full ${isMobile ? 'w-4 h-4' : 'w-5 h-5'} flex items-center justify-center border border-gray-600`}> */}
+                                {/* </div> */}
+                              </motion.div>
+                              <span className="text-center" style={{ fontSize: '10px' }}>{colorObj.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  }
+
                 </motion.div>
               )}
 
@@ -1427,9 +1663,9 @@ export default function HairColorChanger() {
               {/* Compact tips section */}
               <div className={`text-center text-gray-400 ${isMobile ? 'text-xs' : 'text-sm'} mt-1`}>
                 <div className="flex items-center justify-center gap-2">
-                  <span>
-                    تصویر و ویدیو شما به هیچ عنوان توسط ما ذخیره نمیشود
-                  </span>
+                  {/* <span> */}
+                  {/*   تصویر و ویدیو شما به هیچ عنوان توسط ما ذخیره نمیشود */}
+                  {/* </span> */}
                 </div>
               </div>
             </div>
@@ -1444,7 +1680,7 @@ export default function HairColorChanger() {
         transition={{ delay: 0.5 }}
         className={`${isMobile ? 'hidden' : 'block'} mt-4 md:mt-6 text-gray-500 text-xs md:text-sm text-center pb-4`}
       >
-        <p className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+        <p className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mt-8">
           تصویر و ویدیو شما به هیچ عنوان توسط ما ذخیره نمیشود
         </p>
       </motion.footer>
