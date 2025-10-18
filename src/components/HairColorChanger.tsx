@@ -646,6 +646,11 @@ export default function HairColorChanger() {
         data[pixelIdx] = Math.max(0, Math.min(255, blendR - textureR));
         data[pixelIdx + 1] = Math.max(0, Math.min(255, blendG - textureG));
         data[pixelIdx + 2] = Math.max(0, Math.min(255, blendB - textureB));
+
+        // Apply alpha transparency for smooth edge fading
+        // Use an eased curve for smoother fade at edges
+        const alphaFade = Math.pow(maskValue, 0.7);
+        data[pixelIdx + 3] = Math.max(0, Math.min(255, alphaFade * 255));
       }
 
       ctx.putImageData(imageData, 0, 0);
