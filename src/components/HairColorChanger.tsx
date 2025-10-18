@@ -478,8 +478,8 @@ export default function HairColorChanger() {
     const highlightMask = new Float32Array(width * height);
 
     let topY = height, bottomY = 0, leftX = width, rightX = 0;
-    for (let y = 0; y < height; y += 3) {
-      for (let x = 0; x < width; x += 3) {
+    for (let y = 0; y < height; y += 10) {
+      for (let x = 0; x < width; x += 10) {
         const idx = y * width + x;
         if (smoothMask[idx] > 0.3) {
           topY = Math.min(topY, y);
