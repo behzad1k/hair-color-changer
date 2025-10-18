@@ -904,24 +904,24 @@ export default function HairColorChanger() {
             animate={{ x: 0, opacity: 1 }}
             className="fixed right-4 top-1/2 transform -translate-y-1/2 w-96 bg-gradient-to-br from-gray-800/95 to-gray-900/95 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-purple-500/30 max-h-[90vh] overflow-y-auto"
           >
-            <div className="flex gap-2 mb-4">
-              <button
-                onClick={() => setActiveTab('color')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  activeTab === 'color' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
-                }`}
-              >
-                رنگ پایه
-              </button>
-              <button
-                onClick={() => setActiveTab('highlights')}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  activeTab === 'highlights' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
-                }`}
-              >
-                هایلایت
-              </button>
-            </div>
+            {/* <div className="flex gap-2 mb-4"> */}
+            {/*   <button */}
+            {/*     onClick={() => setActiveTab('color')} */}
+            {/*     className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${ */}
+            {/*       activeTab === 'color' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300' */}
+            {/*     }`} */}
+            {/*   > */}
+            {/*     رنگ پایه */}
+            {/*   </button> */}
+            {/*   <button */}
+            {/*     onClick={() => setActiveTab('highlights')} */}
+            {/*     className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${ */}
+            {/*       activeTab === 'highlights' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300' */}
+            {/*     }`} */}
+            {/*   > */}
+            {/*     هایلایت */}
+            {/*   </button> */}
+            {/* </div> */}
 
             {activeTab === 'color' && (
               <>
