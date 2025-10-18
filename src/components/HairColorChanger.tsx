@@ -58,13 +58,6 @@ const HIGHLIGHT_COLORS = [
   { color: '#E6E6FA', title: 'لاوندر' }
 ];
 
-const BLEND_MODES = {
-  MULTIPLY: 'multiply',
-  OVERLAY: 'overlay',
-  SOFT_LIGHT: 'soft_light',
-  COLOR: 'color'
-};
-
 export default function HairColorChanger() {
   const [width, height] = useWindowSize();
   const isMobile = width < 768;
@@ -78,13 +71,18 @@ export default function HairColorChanger() {
   const animationFrameRef = useRef<number>(0);
   const initializedRef = useRef(false);
 
+  // Performance optimization: reusable buffers
+  const smoothMaskBufferRef = useRef<Float32Array | null>(null);
+  const highlightCacheRef = useRef<Float32Array | null>(null);
+  const lastHighlightSettingsRef = useRef<string>('');
+  const lastMaskHashRef = useRef<number>(0);
+
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [selectedColor, setSelectedColor] = useState(COLOR_PALETTE[7]);
   const [selectedHighlightColor, setSelectedHighlightColor] = useState(HIGHLIGHT_COLORS[0]);
   const [highlightMode, setHighlightMode] = useState(false);
   const [highlightIntensity, setHighlightIntensity] = useState(0.4);
   const [colorIntensity, setColorIntensity] = useState(0.7);
-  const [blendMode, setBlendMode] = useState(BLEND_MODES.SOFT_LIGHT);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,7 +92,13 @@ export default function HairColorChanger() {
   const [activeTab, setActiveTab] = useState<'color' | 'highlights'>('color');
   const [colorCat, setColorCat] = useState<any>(null);
 
-  // Color conversion utilities
+  // Invalidate caches when settings change
+  useEffect(() => {
+    highlightCacheRef.current = null;
+    lastHighlightSettingsRef.current = '';
+  }, [selectedColor, selectedHighlightColor, highlightMode, highlightIntensity, colorIntensity]);
+
+  // Optimized color conversion utilities
   const rgbToHsv = (r: number, g: number, b: number) => {
     r /= 255; g /= 255; b /= 255;
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -103,7 +107,7 @@ export default function HairColorChanger() {
     const v = max;
     let h = 0;
 
-    if (max !== min) {
+    if (d !== 0) {
       switch (max) {
         case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
         case g: h = ((b - r) / d + 2) / 6; break;
@@ -141,113 +145,101 @@ export default function HairColorChanger() {
     } : { r: 0, g: 0, b: 0 };
   };
 
-  // Professional blend mode implementations
-  const blendMultiply = (base: number, blend: number) => (base * blend) / 255;
-
-  const blendOverlay = (base: number, blend: number) => {
-    return base < 128
-      ? (2 * base * blend) / 255
-      : 255 - (2 * (255 - base) * (255 - blend)) / 255;
-  };
-
-  const blendSoftLight = (base: number, blend: number) => {
-    if (blend < 128) {
-      return base - (255 - 2 * blend) * base * (255 - base) / (255 * 255);
-    } else {
-      const d = base < 64
-        ? ((16 * base - 12) * base + 4) * base / 255
-        : Math.sqrt(base / 255) * 255;
-      return base + (2 * blend - 255) * (d - base) / 255;
+  // Fast hash function for mask comparison
+  const hashMask = (maskData: Uint8Array, sampleRate: number = 100): number => {
+    let hash = 0;
+    for (let i = 0; i < maskData.length; i += sampleRate) {
+      hash = ((hash << 5) - hash) + maskData[i];
+      hash = hash & hash; // Convert to 32bit integer
     }
+    return hash;
   };
 
-  const applyBlendMode = (base: number, blend: number, mode: string) => {
-    switch (mode) {
-      case BLEND_MODES.MULTIPLY: return blendMultiply(base, blend);
-      case BLEND_MODES.OVERLAY: return blendOverlay(base, blend);
-      case BLEND_MODES.SOFT_LIGHT: return blendSoftLight(base, blend);
-      default: return blend;
+  // Optimized mask processing - reuses buffers and caches results
+  const createOptimizedMask = (maskData: Uint8Array, width: number, height: number) => {
+    // Check if mask changed significantly
+    const currentHash = hashMask(maskData);
+    if (currentHash === lastMaskHashRef.current && smoothMaskBufferRef.current) {
+      return smoothMaskBufferRef.current;
     }
-  };
+    lastMaskHashRef.current = currentHash;
 
-  // Advanced mask processing with distance transform
-  const createAdvancedMask = (maskData: Uint8Array, width: number, height: number) => {
-    const smoothMask = new Float32Array(width * height);
-    const distanceMap = new Float32Array(width * height);
+    // Reuse buffer if exists
+    if (!smoothMaskBufferRef.current || smoothMaskBufferRef.current.length !== width * height) {
+      smoothMaskBufferRef.current = new Float32Array(width * height);
+    }
+    const smoothMask = smoothMaskBufferRef.current;
 
-    // Initialize
+    // Initialize with binary mask
     for (let i = 0; i < maskData.length; i++) {
       smoothMask[i] = maskData[i] > 0 ? 1 : 0;
-      distanceMap[i] = smoothMask[i] > 0 ? 0 : 9999;
     }
 
-    // Distance transform for better edge feathering
-    for (let y = 1; y < height - 1; y++) {
-      for (let x = 1; x < width - 1; x++) {
+    // Single-pass optimized Gaussian blur (replaces 3-pass version)
+    const tempMask = new Float32Array(smoothMask);
+    const radius = 3;
+    const sigma = radius / 2;
+    const sigma2 = 2 * sigma * sigma;
+
+    for (let y = radius; y < height - radius; y++) {
+      for (let x = radius; x < width - radius; x++) {
         const idx = y * width + x;
-        if (distanceMap[idx] > 0) {
-          const minDist = Math.min(
-            distanceMap[(y-1) * width + x] + 1,
-            distanceMap[y * width + (x-1)] + 1,
-            distanceMap[(y-1) * width + (x-1)] + 1.414,
-            distanceMap[(y-1) * width + (x+1)] + 1.414
-          );
-          distanceMap[idx] = Math.min(distanceMap[idx], minDist);
-        }
-      }
-    }
+        if (tempMask[idx] > 0 ||
+          tempMask[(y-1) * width + x] > 0 ||
+          tempMask[(y+1) * width + x] > 0 ||
+          tempMask[y * width + (x-1)] > 0 ||
+          tempMask[y * width + (x+1)] > 0) {
 
-    // Multi-pass Gaussian blur for ultra-smooth edges
-    const passes = 3;
-    for (let pass = 0; pass < passes; pass++) {
-      const tempMask = new Float32Array(smoothMask);
-      const radius = 2 + pass;
-
-      for (let y = radius; y < height - radius; y++) {
-        for (let x = radius; x < width - radius; x++) {
           let sum = 0, weightSum = 0;
-
-          for (let dy = -radius; dy <= radius; dy++) {
-            for (let dx = -radius; dx <= radius; dx++) {
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist <= radius) {
-                const weight = Math.exp(-dist * dist / (2 * radius * radius));
+          for (let dy = -radius; dy <= radius; dy += 1) {
+            for (let dx = -radius; dx <= radius; dx += 1) {
+              const dist2 = dx * dx + dy * dy;
+              if (dist2 <= radius * radius) {
+                const weight = Math.exp(-dist2 / sigma2);
                 sum += tempMask[(y + dy) * width + (x + dx)] * weight;
                 weightSum += weight;
               }
             }
           }
-          smoothMask[y * width + x] = sum / weightSum;
+          smoothMask[idx] = sum / weightSum;
         }
       }
     }
 
-    // Apply distance-based feathering
-    const featherDistance = 8;
+    // Simple edge feathering
     for (let i = 0; i < smoothMask.length; i++) {
-      if (distanceMap[i] > 0 && distanceMap[i] < featherDistance) {
-        const feather = 1 - (distanceMap[i] / featherDistance);
-        smoothMask[i] *= feather;
+      if (smoothMask[i] > 0 && smoothMask[i] < 1) {
+        smoothMask[i] = smoothMask[i] * smoothMask[i]; // Smooth curve
       }
     }
 
     return smoothMask;
   };
 
-  // Generate natural highlight pattern
-  const generateNaturalHighlights = (
+  // Optimized highlight generation with caching
+  const generateOptimizedHighlights = (
     width: number,
     height: number,
     smoothMask: Float32Array,
     imageData: ImageData
   ) => {
+    if (!highlightMode) {
+      return new Float32Array(width * height);
+    }
+
+    // Check cache
+    const settingsHash = `${highlightMode}-${highlightIntensity}-${selectedHighlightColor.color}-${width}x${height}`;
+    if (settingsHash === lastHighlightSettingsRef.current && highlightCacheRef.current) {
+      return highlightCacheRef.current;
+    }
+    lastHighlightSettingsRef.current = settingsHash;
+
     const highlightMask = new Float32Array(width * height);
-    if (!highlightMode) return highlightMask;
 
     // Find hair boundaries
     let topY = height, bottomY = 0, leftX = width, rightX = 0;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y += 2) { // Sample every 2 pixels for speed
+      for (let x = 0; x < width; x += 2) {
         const idx = y * width + x;
         if (smoothMask[idx] > 0.3) {
           topY = Math.min(topY, y);
@@ -262,208 +254,146 @@ export default function HairColorChanger() {
     const hairWidth = rightX - leftX;
     if (hairHeight <= 0 || hairWidth <= 0) return highlightMask;
 
-    // Create brightness map for intelligent highlight placement
+    // Simplified strand-based highlights
+    const numStrands = 8; // Reduced from 12
+    const strandWidth = hairWidth / numStrands;
+    const activeStrands = [1, 3, 5, 7]; // Reduced pattern
+
+    // Pre-calculate brightness map (downsampled)
     const brightnessMap = new Float32Array(width * height);
     for (let i = 0; i < width * height; i++) {
       const pixelIdx = i * 4;
-      const r = imageData.data[pixelIdx];
-      const g = imageData.data[pixelIdx + 1];
-      const b = imageData.data[pixelIdx + 2];
-      brightnessMap[i] = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+      brightnessMap[i] = (
+        imageData.data[pixelIdx] * 0.299 +
+        imageData.data[pixelIdx + 1] * 0.587 +
+        imageData.data[pixelIdx + 2] * 0.114
+      ) / 255;
     }
 
-    // Strategic placement zones
-    const zones = [
-      { start: 0.0, end: 0.25, intensity: 0.3, name: 'crown' },
-      { start: 0.25, end: 0.5, intensity: 0.2, name: 'mid' },
-      { start: 0.5, end: 0.75, intensity: 0.4, name: 'mid-ends' },
-      { start: 0.75, end: 1.0, intensity: 0.6, name: 'ends' }
-    ];
-
-    // Natural strand simulation
-    const numStrands = 12;
-    const strandWidth = hairWidth / numStrands;
-    const activeStrands = [1, 3, 5, 7, 9, 11]; // Alternating pattern
-
+    // Apply highlights with simplified math
     for (let y = topY; y <= bottomY; y++) {
       const verticalPos = (y - topY) / hairHeight;
-      const currentZone = zones.find(z => verticalPos >= z.start && verticalPos < z.end);
-      if (!currentZone) continue;
+      const verticalGradient = verticalPos * verticalPos; // Quadratic falloff
 
       for (let x = leftX; x <= rightX; x++) {
         const idx = y * width + x;
         const maskValue = smoothMask[idx];
 
-        if (maskValue > 0.1) {
+        if (maskValue > 0.15) {
           const relativeX = x - leftX;
           const strandIdx = Math.floor(relativeX / strandWidth);
 
           if (activeStrands.includes(strandIdx)) {
-            // Position within strand for smooth gradient
             const posInStrand = (relativeX % strandWidth) / strandWidth;
-            const strandGradient = Math.sin(posInStrand * Math.PI) * 0.8 + 0.2;
-
-            // Brightness-based placement (highlights go on lighter areas naturally)
+            const strandGradient = Math.sin(posInStrand * Math.PI);
             const brightness = brightnessMap[idx];
-            const brightnessBoost = Math.pow(brightness, 0.7);
 
-            // Vertical gradient (stronger towards ends)
-            const verticalGradient = Math.pow(verticalPos, 1.5);
-
-            // Natural variation using perlin-like noise
-            const noiseX = Math.sin(x * 0.1) * Math.cos(y * 0.08);
-            const noiseY = Math.cos(x * 0.12) * Math.sin(y * 0.09);
-            const naturalVariation = (noiseX + noiseY) * 0.15 + 0.85;
-
-            // Combine all factors
+            // Simplified calculation
             const highlightStrength =
               maskValue *
               strandGradient *
-              brightnessBoost *
+              brightness *
               verticalGradient *
-              currentZone.intensity *
-              naturalVariation;
+              highlightIntensity;
 
-            highlightMask[idx] = Math.max(highlightMask[idx], highlightStrength);
+            highlightMask[idx] = Math.min(1, highlightStrength);
           }
         }
       }
     }
 
-    // Smooth highlights
-    const smoothedHighlights = new Float32Array(highlightMask);
-    const smoothRadius = 2;
-    for (let y = smoothRadius; y < height - smoothRadius; y++) {
-      for (let x = smoothRadius; x < width - smoothRadius; x++) {
-        const idx = y * width + x;
-        if (highlightMask[idx] > 0) {
-          let sum = 0, count = 0;
-          for (let dy = -smoothRadius; dy <= smoothRadius; dy++) {
-            for (let dx = -smoothRadius; dx <= smoothRadius; dx++) {
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist <= smoothRadius) {
-                const weight = Math.exp(-dist * dist / (smoothRadius * smoothRadius));
-                sum += highlightMask[(y + dy) * width + (x + dx)] * weight;
-                count += weight;
-              }
-            }
-          }
-          smoothedHighlights[idx] = (sum / count) * highlightIntensity;
-        }
-      }
-    }
-
-    return smoothedHighlights;
+    highlightCacheRef.current = highlightMask;
+    return highlightMask;
   };
 
-  // Main hair coloring function with all techniques
-  const applyProfessionalHairColor = useCallback((ctx: CanvasRenderingContext2D, mask: any) => {
+  // Optimized main coloring function - HSV only approach
+  const applyOptimizedHairColor = useCallback((ctx: CanvasRenderingContext2D, mask: any) => {
     try {
       const { width, height } = ctx.canvas;
       const maskData = mask.getAsUint8Array();
       const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
 
-      // Get color variants for gradient mapping
+      // Get color variants
       const baseColor = hexToRgb(selectedColor.color);
       const lightVariant = hexToRgb(selectedColor.lightVariant);
       const darkVariant = hexToRgb(selectedColor.darkVariant);
       const highlightColor = hexToRgb(selectedHighlightColor.color);
 
-      // Convert colors to HSV
+      // Convert to HSV once
       const baseHsv = rgbToHsv(baseColor.r, baseColor.g, baseColor.b);
       const highlightHsv = rgbToHsv(highlightColor.r, highlightColor.g, highlightColor.b);
 
-      // Create advanced mask with smooth edges
-      const smoothMask = createAdvancedMask(maskData, width, height);
+      // Create optimized mask
+      const smoothMask = createOptimizedMask(maskData, width, height);
 
-      // Generate natural highlight pattern
-      const highlightMask = generateNaturalHighlights(width, height, smoothMask, imageData);
+      // Generate highlights (cached)
+      const highlightMask = generateOptimizedHighlights(width, height, smoothMask, imageData);
 
-      // Apply coloring with all techniques
+      // Single-pass color application
       for (let i = 0; i < width * height; i++) {
-        const pixelIdx = i * 4;
         const maskValue = smoothMask[i];
+        if (maskValue < 0.02) continue;
+
         const highlightValue = highlightMask[i];
+        const pixelIdx = i * 4;
 
-        if (maskValue > 0.02) {
-          const originalR = imageData.data[pixelIdx];
-          const originalG = imageData.data[pixelIdx + 1];
-          const originalB = imageData.data[pixelIdx + 2];
+        const originalR = data[pixelIdx];
+        const originalG = data[pixelIdx + 1];
+        const originalB = data[pixelIdx + 2];
 
-          // Get original HSV
-          const originalHsv = rgbToHsv(originalR, originalG, originalB);
-          const brightness = originalHsv.v;
+        // Get original HSV
+        const originalHsv = rgbToHsv(originalR, originalG, originalB);
+        const brightness = originalHsv.v;
 
-          // Gradient mapping: map brightness to color variant
-          let targetColor: any;
-          if (brightness < 0.3) {
-            // Dark areas use dark variant
-            targetColor = darkVariant;
-          } else if (brightness > 0.7) {
-            // Light areas use light variant
-            targetColor = lightVariant;
-          } else {
-            // Mid-tones use base color
-            const lerpFactor = (brightness - 0.3) / 0.4;
-            targetColor = {
-              r: darkVariant.r + (baseColor.r - darkVariant.r) * lerpFactor,
-              g: darkVariant.g + (baseColor.g - darkVariant.g) * lerpFactor,
-              b: darkVariant.b + (baseColor.b - darkVariant.b) * lerpFactor
-            };
-          }
-
-          // If highlight, use highlight color
-          if (highlightValue > 0.1) {
-            targetColor = highlightColor;
-          }
-
-          // HSV-based coloring: change hue while preserving luminosity
-          const targetHsv = highlightValue > 0.1 ? highlightHsv : baseHsv;
-          const newHsv = {
-            h: targetHsv.h,
-            s: Math.min(1, targetHsv.s + originalHsv.s * 0.3), // Boost saturation slightly
-            v: originalHsv.v // Preserve original brightness
+        // Select target color based on brightness (gradient mapping)
+        let targetRgb: any;
+        if (highlightValue > 0.15) {
+          targetRgb = highlightColor;
+        } else if (brightness < 0.3) {
+          targetRgb = darkVariant;
+        } else if (brightness > 0.7) {
+          targetRgb = lightVariant;
+        } else {
+          // Linear interpolation for mid-tones
+          const t = (brightness - 0.3) / 0.4;
+          targetRgb = {
+            r: darkVariant.r + (baseColor.r - darkVariant.r) * t,
+            g: darkVariant.g + (baseColor.g - darkVariant.g) * t,
+            b: darkVariant.b + (baseColor.b - darkVariant.b) * t
           };
-          const hsvColor = hsvToRgb(newHsv.h, newHsv.s, newHsv.v);
-
-          // Blend RGB color with blend mode
-          let blendedR = applyBlendMode(originalR, targetColor.r, blendMode);
-          let blendedG = applyBlendMode(originalG, targetColor.g, blendMode);
-          let blendedB = applyBlendMode(originalB, targetColor.b, blendMode);
-
-          // Mix HSV result with blend mode result (50/50)
-          blendedR = (blendedR + hsvColor.r) / 2;
-          blendedG = (blendedG + hsvColor.g) / 2;
-          blendedB = (blendedB + hsvColor.b) / 2;
-
-          // Calculate blend intensity
-          const intensity = highlightValue > 0.1
-            ? highlightValue
-            : maskValue * colorIntensity;
-
-          // Texture preservation: keep more original in darker areas
-          const texturePreservation = 1 - (brightness * 0.2);
-          const finalIntensity = intensity * texturePreservation;
-
-          // Final color mix
-          const finalR = blendedR * finalIntensity + originalR * (1 - finalIntensity);
-          const finalG = blendedG * finalIntensity + originalG * (1 - finalIntensity);
-          const finalB = blendedB * finalIntensity + originalB * (1 - finalIntensity);
-
-          // Add subtle shine for realism
-          const shineFactor = brightness > 0.8 ? 1.05 : 1.0;
-
-          imageData.data[pixelIdx] = Math.round(Math.min(255, Math.max(0, finalR * shineFactor)));
-          imageData.data[pixelIdx + 1] = Math.round(Math.min(255, Math.max(0, finalG * shineFactor)));
-          imageData.data[pixelIdx + 2] = Math.round(Math.min(255, Math.max(0, finalB * shineFactor)));
         }
+
+        // HSV-based coloring (preserve luminosity)
+        const targetHsv = highlightValue > 0.15 ? highlightHsv : baseHsv;
+        const newHsv = {
+          h: targetHsv.h,
+          s: Math.min(1, targetHsv.s * 0.9 + originalHsv.s * 0.1), // Slight saturation boost
+          v: originalHsv.v // Preserve brightness
+        };
+
+        const newColor = hsvToRgb(newHsv.h, newHsv.s, newHsv.v);
+
+        // Calculate intensity
+        const effectiveIntensity = highlightValue > 0.15
+          ? highlightValue
+          : maskValue * colorIntensity;
+
+        // Texture preservation in shadows
+        const preservationFactor = 1 - (brightness * 0.15);
+        const finalIntensity = effectiveIntensity * preservationFactor;
+
+        // Final blend
+        data[pixelIdx] = newColor.r * finalIntensity + originalR * (1 - finalIntensity);
+        data[pixelIdx + 1] = newColor.g * finalIntensity + originalG * (1 - finalIntensity);
+        data[pixelIdx + 2] = newColor.b * finalIntensity + originalB * (1 - finalIntensity);
       }
 
       ctx.putImageData(imageData, 0, 0);
     } catch (error) {
       console.error('Error applying hair color:', error);
     }
-  }, [selectedColor, selectedHighlightColor, highlightMode, highlightIntensity, colorIntensity, blendMode]);
+  }, [selectedColor, selectedHighlightColor, highlightMode, highlightIntensity, colorIntensity]);
 
   const processFrame = useCallback(async () => {
     if (!isCameraOn || !hairSegmenterRef.current || isProcessing) {
@@ -472,7 +402,8 @@ export default function HairColorChanger() {
     }
 
     const now = Date.now();
-    if (now - lastProcessTimeRef.current < 80) {
+    // Target 15 FPS for better performance
+    if (now - lastProcessTimeRef.current < 66) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
@@ -496,7 +427,7 @@ export default function HairColorChanger() {
         const segmentationResult = await hairSegmenterRef.current.segmentForVideo(video, now);
 
         if (segmentationResult.categoryMask) {
-          applyProfessionalHairColor(ctx, segmentationResult.categoryMask);
+          applyOptimizedHairColor(ctx, segmentationResult.categoryMask);
         }
       }
     } catch (err) {
@@ -505,7 +436,7 @@ export default function HairColorChanger() {
       setIsProcessing(false);
       animationFrameRef.current = requestAnimationFrame(processFrame);
     }
-  }, [isCameraOn, isProcessing, applyProfessionalHairColor]);
+  }, [isCameraOn, isProcessing, applyOptimizedHairColor]);
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -751,20 +682,6 @@ export default function HairColorChanger() {
                       className="w-full"
                     />
                   </div>
-
-                  <div>
-                    <label className="text-white text-sm mb-2 block text-right">حالت ترکیب</label>
-                    <select
-                      value={blendMode}
-                      onChange={(e) => setBlendMode(e.target.value)}
-                      className="w-full bg-gray-700 text-white rounded-lg px-3 py-2"
-                    >
-                      <option value={BLEND_MODES.SOFT_LIGHT}>نرم (توصیه می‌شود)</option>
-                      <option value={BLEND_MODES.MULTIPLY}>تیره</option>
-                      <option value={BLEND_MODES.OVERLAY}>روشن</option>
-                      <option value={BLEND_MODES.COLOR}>رنگ خالص</option>
-                    </select>
-                  </div>
                 </div>
               </>
             )}
@@ -913,20 +830,6 @@ export default function HairColorChanger() {
                         onChange={(e) => setColorIntensity(parseFloat(e.target.value))}
                         className="w-full"
                       />
-                    </div>
-
-                    <div>
-                      <label className="text-white text-sm mb-2 block text-right">حالت ترکیب</label>
-                      <select
-                        value={blendMode}
-                        onChange={(e) => setBlendMode(e.target.value)}
-                        className="w-full bg-gray-700 text-white rounded-lg px-3 py-2 text-sm"
-                      >
-                        <option value={BLEND_MODES.SOFT_LIGHT}>نرم (توصیه می‌شود)</option>
-                        <option value={BLEND_MODES.MULTIPLY}>تیره</option>
-                        <option value={BLEND_MODES.OVERLAY}>روشن</option>
-                        <option value={BLEND_MODES.COLOR}>رنگ خالص</option>
-                      </select>
                     </div>
                   </div>
                 </>
