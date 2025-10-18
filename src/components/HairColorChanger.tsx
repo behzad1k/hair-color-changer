@@ -58,8 +58,20 @@ const HIGHLIGHT_COLORS = [
   { color: '#E6E6FA', title: 'لاوندر' }
 ];
 
+const detectDevice = () => {
+  const ua = navigator.userAgent;
+  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+
+  return {
+    isMobile: isMobileDevice,
+    preferCPU: isMobileDevice,
+    targetFPS: isMobileDevice ? 15 : 24
+  };
+};
+
 export default function HairColorChanger() {
   const [width, height] = useWindowSize();
+  const deviceConfig = detectDevice();
   const isMobile = width < 768;
   const isTablet = width >= 768 && width < 1024;
   const isDesktop = width >= 1024;
@@ -71,11 +83,9 @@ export default function HairColorChanger() {
   const animationFrameRef = useRef<number>(0);
   const initializedRef = useRef(false);
 
-  // Performance optimization: reusable buffers
   const smoothMaskBufferRef = useRef<Float32Array | null>(null);
   const highlightCacheRef = useRef<Float32Array | null>(null);
   const lastHighlightSettingsRef = useRef<string>('');
-  const lastMaskHashRef = useRef<number>(0);
 
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [selectedColor, setSelectedColor] = useState(COLOR_PALETTE[7]);
@@ -92,49 +102,10 @@ export default function HairColorChanger() {
   const [activeTab, setActiveTab] = useState<'color' | 'highlights'>('color');
   const [colorCat, setColorCat] = useState<any>(null);
 
-  // Invalidate caches when settings change
   useEffect(() => {
     highlightCacheRef.current = null;
     lastHighlightSettingsRef.current = '';
   }, [selectedColor, selectedHighlightColor, highlightMode, highlightIntensity, colorIntensity]);
-
-  // Optimized color conversion utilities
-  const rgbToHsv = (r: number, g: number, b: number) => {
-    r /= 255; g /= 255; b /= 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    const d = max - min;
-    const s = max === 0 ? 0 : d / max;
-    const v = max;
-    let h = 0;
-
-    if (d !== 0) {
-      switch (max) {
-        case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-        case g: h = ((b - r) / d + 2) / 6; break;
-        case b: h = ((r - g) / d + 4) / 6; break;
-      }
-    }
-    return { h, s, v };
-  };
-
-  const hsvToRgb = (h: number, s: number, v: number) => {
-    const i = Math.floor(h * 6);
-    const f = h * 6 - i;
-    const p = v * (1 - s);
-    const q = v * (1 - f * s);
-    const t = v * (1 - (1 - f) * s);
-
-    let r = 0, g = 0, b = 0;
-    switch (i % 6) {
-      case 0: r = v; g = t; b = p; break;
-      case 1: r = q; g = v; b = p; break;
-      case 2: r = p; g = v; b = t; break;
-      case 3: r = p; g = q; b = v; break;
-      case 4: r = t; g = p; b = v; break;
-      case 5: r = v; g = p; b = q; break;
-    }
-    return { r: r * 255, g: g * 255, b: b * 255 };
-  };
 
   const hexToRgb = (hex: string) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -145,79 +116,70 @@ export default function HairColorChanger() {
     } : { r: 0, g: 0, b: 0 };
   };
 
-  // Fast hash function for mask comparison
-  const hashMask = (maskData: Uint8Array, sampleRate: number = 100): number => {
-    let hash = 0;
-    for (let i = 0; i < maskData.length; i += sampleRate) {
-      hash = ((hash << 5) - hash) + maskData[i];
-      hash = hash & hash; // Convert to 32bit integer
+  // Fast box blur for smooth edges - much faster than Gaussian
+  const fastBoxBlur = (data: Float32Array, width: number, height: number, radius: number) => {
+    const temp = new Float32Array(data.length);
+
+    // Horizontal pass
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let sum = 0, count = 0;
+        for (let dx = -radius; dx <= radius; dx++) {
+          const nx = x + dx;
+          if (nx >= 0 && nx < width) {
+            sum += data[y * width + nx];
+            count++;
+          }
+        }
+        temp[y * width + x] = sum / count;
+      }
     }
-    return hash;
+
+    // Vertical pass
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let sum = 0, count = 0;
+        for (let dy = -radius; dy <= radius; dy++) {
+          const ny = y + dy;
+          if (ny >= 0 && ny < height) {
+            sum += temp[ny * width + x];
+            count++;
+          }
+        }
+        data[y * width + x] = sum / count;
+      }
+    }
   };
 
-  // Optimized mask processing - reuses buffers and caches results
-  const createOptimizedMask = (maskData: Uint8Array, width: number, height: number) => {
-    // Check if mask changed significantly
-    const currentHash = hashMask(maskData);
-    if (currentHash === lastMaskHashRef.current && smoothMaskBufferRef.current) {
-      return smoothMaskBufferRef.current;
-    }
-    lastMaskHashRef.current = currentHash;
-
-    // Reuse buffer if exists
+  // Super fast mask smoothing
+  const createFastSmoothMask = (maskData: Uint8Array, width: number, height: number) => {
     if (!smoothMaskBufferRef.current || smoothMaskBufferRef.current.length !== width * height) {
       smoothMaskBufferRef.current = new Float32Array(width * height);
     }
     const smoothMask = smoothMaskBufferRef.current;
 
-    // Initialize with binary mask
+    // Initialize
     for (let i = 0; i < maskData.length; i++) {
       smoothMask[i] = maskData[i] > 0 ? 1 : 0;
     }
 
-    // Single-pass optimized Gaussian blur (replaces 3-pass version)
-    const tempMask = new Float32Array(smoothMask);
-    const radius = 3;
-    const sigma = radius / 2;
-    const sigma2 = 2 * sigma * sigma;
-
-    for (let y = radius; y < height - radius; y++) {
-      for (let x = radius; x < width - radius; x++) {
-        const idx = y * width + x;
-        if (tempMask[idx] > 0 ||
-          tempMask[(y-1) * width + x] > 0 ||
-          tempMask[(y+1) * width + x] > 0 ||
-          tempMask[y * width + (x-1)] > 0 ||
-          tempMask[y * width + (x+1)] > 0) {
-
-          let sum = 0, weightSum = 0;
-          for (let dy = -radius; dy <= radius; dy += 1) {
-            for (let dx = -radius; dx <= radius; dx += 1) {
-              const dist2 = dx * dx + dy * dy;
-              if (dist2 <= radius * radius) {
-                const weight = Math.exp(-dist2 / sigma2);
-                sum += tempMask[(y + dy) * width + (x + dx)] * weight;
-                weightSum += weight;
-              }
-            }
-          }
-          smoothMask[idx] = sum / weightSum;
-        }
-      }
-    }
+    // Single box blur pass - much faster
+    const blurRadius = deviceConfig.isMobile ? 2 : 3;
+    fastBoxBlur(smoothMask, width, height, blurRadius);
 
     // Simple edge feathering
     for (let i = 0; i < smoothMask.length; i++) {
       if (smoothMask[i] > 0 && smoothMask[i] < 1) {
-        smoothMask[i] = smoothMask[i] * smoothMask[i]; // Smooth curve
+        const t = smoothMask[i];
+        smoothMask[i] = t * t * (3 - 2 * t); // Smoothstep
       }
     }
 
     return smoothMask;
   };
 
-  // Optimized highlight generation with caching
-  const generateOptimizedHighlights = (
+  // Simplified highlight generation
+  const generateFastHighlights = (
     width: number,
     height: number,
     smoothMask: Float32Array,
@@ -227,8 +189,7 @@ export default function HairColorChanger() {
       return new Float32Array(width * height);
     }
 
-    // Check cache
-    const settingsHash = `${highlightMode}-${highlightIntensity}-${selectedHighlightColor.color}-${width}x${height}`;
+    const settingsHash = `${highlightIntensity}-${selectedHighlightColor.color}`;
     if (settingsHash === lastHighlightSettingsRef.current && highlightCacheRef.current) {
       return highlightCacheRef.current;
     }
@@ -236,67 +197,30 @@ export default function HairColorChanger() {
 
     const highlightMask = new Float32Array(width * height);
 
-    // Find hair boundaries
-    let topY = height, bottomY = 0, leftX = width, rightX = 0;
-    for (let y = 0; y < height; y += 2) { // Sample every 2 pixels for speed
-      for (let x = 0; x < width; x += 2) {
-        const idx = y * width + x;
-        if (smoothMask[idx] > 0.3) {
-          topY = Math.min(topY, y);
-          bottomY = Math.max(bottomY, y);
-          leftX = Math.min(leftX, x);
-          rightX = Math.max(rightX, x);
-        }
-      }
-    }
+    // Fast strand-based highlights
+    for (let y = 0; y < height; y += 2) { // Process every 2nd row
+      const yFactor = Math.sin((y / height) * Math.PI); // Top to bottom fade
 
-    const hairHeight = bottomY - topY;
-    const hairWidth = rightX - leftX;
-    if (hairHeight <= 0 || hairWidth <= 0) return highlightMask;
-
-    // Simplified strand-based highlights
-    const numStrands = 8; // Reduced from 12
-    const strandWidth = hairWidth / numStrands;
-    const activeStrands = [1, 3, 5, 7]; // Reduced pattern
-
-    // Pre-calculate brightness map (downsampled)
-    const brightnessMap = new Float32Array(width * height);
-    for (let i = 0; i < width * height; i++) {
-      const pixelIdx = i * 4;
-      brightnessMap[i] = (
-        imageData.data[pixelIdx] * 0.299 +
-        imageData.data[pixelIdx + 1] * 0.587 +
-        imageData.data[pixelIdx + 2] * 0.114
-      ) / 255;
-    }
-
-    // Apply highlights with simplified math
-    for (let y = topY; y <= bottomY; y++) {
-      const verticalPos = (y - topY) / hairHeight;
-      const verticalGradient = verticalPos * verticalPos; // Quadratic falloff
-
-      for (let x = leftX; x <= rightX; x++) {
+      for (let x = 0; x < width; x += 2) { // Process every 2nd column
         const idx = y * width + x;
         const maskValue = smoothMask[idx];
 
-        if (maskValue > 0.15) {
-          const relativeX = x - leftX;
-          const strandIdx = Math.floor(relativeX / strandWidth);
+        if (maskValue > 0.2) {
+          // Simple strand pattern
+          const strandPattern = Math.sin((x / width) * Math.PI * 6) > 0.5 ? 1 : 0;
 
-          if (activeStrands.includes(strandIdx)) {
-            const posInStrand = (relativeX % strandWidth) / strandWidth;
-            const strandGradient = Math.sin(posInStrand * Math.PI);
-            const brightness = brightnessMap[idx];
+          if (strandPattern) {
+            const pixelIdx = idx * 4;
+            const brightness = (imageData.data[pixelIdx] * 0.299 +
+              imageData.data[pixelIdx + 1] * 0.587 +
+              imageData.data[pixelIdx + 2] * 0.114) / 255;
 
-            // Simplified calculation
-            const highlightStrength =
-              maskValue *
-              strandGradient *
-              brightness *
-              verticalGradient *
-              highlightIntensity;
+            highlightMask[idx] = maskValue * yFactor * brightness * highlightIntensity;
 
-            highlightMask[idx] = Math.min(1, highlightStrength);
+            // Fill neighboring pixels
+            if (x + 1 < width) highlightMask[idx + 1] = highlightMask[idx];
+            if (y + 1 < height) highlightMask[(y + 1) * width + x] = highlightMask[idx];
+            if (x + 1 < width && y + 1 < height) highlightMask[(y + 1) * width + x + 1] = highlightMask[idx];
           }
         }
       }
@@ -306,34 +230,30 @@ export default function HairColorChanger() {
     return highlightMask;
   };
 
-  // Optimized main coloring function - HSV only approach
-  const applyOptimizedHairColor = useCallback((ctx: CanvasRenderingContext2D, mask: any) => {
+  // IMPROVED: Better color application with brightness adjustment for high contrast
+  const applyFastHairColor = useCallback((ctx: CanvasRenderingContext2D, mask: any) => {
     try {
       const { width, height } = ctx.canvas;
       const maskData = mask.getAsUint8Array();
       const imageData = ctx.getImageData(0, 0, width, height);
       const data = imageData.data;
 
-      // Get color variants
       const baseColor = hexToRgb(selectedColor.color);
       const lightVariant = hexToRgb(selectedColor.lightVariant);
       const darkVariant = hexToRgb(selectedColor.darkVariant);
       const highlightColor = hexToRgb(selectedHighlightColor.color);
 
-      // Convert to HSV once
-      const baseHsv = rgbToHsv(baseColor.r, baseColor.g, baseColor.b);
-      const highlightHsv = rgbToHsv(highlightColor.r, highlightColor.g, highlightColor.b);
+      // Calculate target brightness
+      const targetBrightness = (baseColor.r * 0.299 + baseColor.g * 0.587 + baseColor.b * 0.114) / 255;
+      const isLightColor = targetBrightness > 0.5;
 
-      // Create optimized mask
-      const smoothMask = createOptimizedMask(maskData, width, height);
+      const smoothMask = createFastSmoothMask(maskData, width, height);
+      const highlightMask = generateFastHighlights(width, height, smoothMask, imageData);
 
-      // Generate highlights (cached)
-      const highlightMask = generateOptimizedHighlights(width, height, smoothMask, imageData);
-
-      // Single-pass color application
+      // Fast pixel processing
       for (let i = 0; i < width * height; i++) {
         const maskValue = smoothMask[i];
-        if (maskValue < 0.02) continue;
+        if (maskValue < 0.05) continue;
 
         const highlightValue = highlightMask[i];
         const pixelIdx = i * 4;
@@ -342,58 +262,70 @@ export default function HairColorChanger() {
         const originalG = data[pixelIdx + 1];
         const originalB = data[pixelIdx + 2];
 
-        // Get original HSV
-        const originalHsv = rgbToHsv(originalR, originalG, originalB);
-        const brightness = originalHsv.v;
+        // Calculate original brightness
+        const originalBrightness = (originalR * 0.299 + originalG * 0.587 + originalB * 0.114) / 255;
 
-        // Select target color based on brightness (gradient mapping)
-        let targetRgb: any;
+        let targetR, targetG, targetB;
+
         if (highlightValue > 0.15) {
-          targetRgb = highlightColor;
-        } else if (brightness < 0.3) {
-          targetRgb = darkVariant;
-        } else if (brightness > 0.7) {
-          targetRgb = lightVariant;
+          // Apply highlight
+          targetR = highlightColor.r;
+          targetG = highlightColor.g;
+          targetB = highlightColor.b;
         } else {
-          // Linear interpolation for mid-tones
-          const t = (brightness - 0.3) / 0.4;
-          targetRgb = {
-            r: darkVariant.r + (baseColor.r - darkVariant.r) * t,
-            g: darkVariant.g + (baseColor.g - darkVariant.g) * t,
-            b: darkVariant.b + (baseColor.b - darkVariant.b) * t
-          };
+          // Choose variant based on brightness
+          let selectedVariant;
+          if (originalBrightness < 0.3) {
+            selectedVariant = darkVariant;
+          } else if (originalBrightness > 0.7) {
+            selectedVariant = lightVariant;
+          } else {
+            selectedVariant = baseColor;
+          }
+
+          // IMPROVED: Boost brightness for light colors on dark hair
+          if (isLightColor && originalBrightness < 0.4) {
+            // Calculate brightness boost
+            const boostFactor = 1.0 + (targetBrightness - originalBrightness) * 1.5;
+
+            targetR = Math.min(255, selectedVariant.r * boostFactor);
+            targetG = Math.min(255, selectedVariant.g * boostFactor);
+            targetB = Math.min(255, selectedVariant.b * boostFactor);
+          } else {
+            targetR = selectedVariant.r;
+            targetG = selectedVariant.g;
+            targetB = selectedVariant.b;
+          }
+
+          // Preserve some original color for natural look
+          const preservationFactor = 0.15;
+          targetR = targetR * (1 - preservationFactor) + originalR * preservationFactor;
+          targetG = targetG * (1 - preservationFactor) + originalG * preservationFactor;
+          targetB = targetB * (1 - preservationFactor) + originalB * preservationFactor;
         }
 
-        // HSV-based coloring (preserve luminosity)
-        const targetHsv = highlightValue > 0.15 ? highlightHsv : baseHsv;
-        const newHsv = {
-          h: targetHsv.h,
-          s: Math.min(1, targetHsv.s * 0.9 + originalHsv.s * 0.1), // Slight saturation boost
-          v: originalHsv.v // Preserve brightness
-        };
-
-        const newColor = hsvToRgb(newHsv.h, newHsv.s, newHsv.v);
-
-        // Calculate intensity
+        // Calculate blend intensity
         const effectiveIntensity = highlightValue > 0.15
-          ? highlightValue
+          ? highlightValue * 0.8
           : maskValue * colorIntensity;
 
-        // Texture preservation in shadows
-        const preservationFactor = 1 - (brightness * 0.15);
-        const finalIntensity = effectiveIntensity * preservationFactor;
+        // Final blend with improved formula for light colors
+        let blendIntensity = effectiveIntensity;
+        if (isLightColor && originalBrightness < 0.4) {
+          // Stronger application for light colors on dark hair
+          blendIntensity = Math.min(1, effectiveIntensity * 1.3);
+        }
 
-        // Final blend
-        data[pixelIdx] = newColor.r * finalIntensity + originalR * (1 - finalIntensity);
-        data[pixelIdx + 1] = newColor.g * finalIntensity + originalG * (1 - finalIntensity);
-        data[pixelIdx + 2] = newColor.b * finalIntensity + originalB * (1 - finalIntensity);
+        data[pixelIdx] = targetR * blendIntensity + originalR * (1 - blendIntensity);
+        data[pixelIdx + 1] = targetG * blendIntensity + originalG * (1 - blendIntensity);
+        data[pixelIdx + 2] = targetB * blendIntensity + originalB * (1 - blendIntensity);
       }
 
       ctx.putImageData(imageData, 0, 0);
     } catch (error) {
       console.error('Error applying hair color:', error);
     }
-  }, [selectedColor, selectedHighlightColor, highlightMode, highlightIntensity, colorIntensity]);
+  }, [selectedColor, selectedHighlightColor, highlightMode, highlightIntensity, colorIntensity, deviceConfig]);
 
   const processFrame = useCallback(async () => {
     if (!isCameraOn || !hairSegmenterRef.current || isProcessing) {
@@ -402,8 +334,9 @@ export default function HairColorChanger() {
     }
 
     const now = Date.now();
-    // Target 15 FPS for better performance
-    if (now - lastProcessTimeRef.current < 66) {
+    const targetFrameTime = 1000 / deviceConfig.targetFPS;
+
+    if (now - lastProcessTimeRef.current < targetFrameTime) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
@@ -427,7 +360,7 @@ export default function HairColorChanger() {
         const segmentationResult = await hairSegmenterRef.current.segmentForVideo(video, now);
 
         if (segmentationResult.categoryMask) {
-          applyOptimizedHairColor(ctx, segmentationResult.categoryMask);
+          applyFastHairColor(ctx, segmentationResult.categoryMask);
         }
       }
     } catch (err) {
@@ -436,7 +369,7 @@ export default function HairColorChanger() {
       setIsProcessing(false);
       animationFrameRef.current = requestAnimationFrame(processFrame);
     }
-  }, [isCameraOn, isProcessing, applyOptimizedHairColor]);
+  }, [isCameraOn, isProcessing, applyFastHairColor, deviceConfig]);
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -444,6 +377,15 @@ export default function HairColorChanger() {
 
     const initializeAndStart = async () => {
       try {
+        // Suppress MediaPipe console warnings
+        const originalConsoleLog = console.log;
+        console.log = (...args) => {
+          const message = args.join(' ');
+          if (!message.includes('SOFTMAX') && !message.includes('segmentation_postprocessor')) {
+            originalConsoleLog.apply(console, args);
+          }
+        };
+
         const vision = await FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.4/wasm'
         );
@@ -451,7 +393,7 @@ export default function HairColorChanger() {
         const options: ImageSegmenterOptions = {
           baseOptions: {
             modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/hair_segmenter/float32/latest/hair_segmenter.tflite',
-            delegate: 'GPU'
+            delegate: deviceConfig.preferCPU ? 'CPU' : 'GPU'
           },
           runningMode: 'VIDEO',
           outputCategoryMask: true,
@@ -464,8 +406,8 @@ export default function HairColorChanger() {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: 'user',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            width: { ideal: deviceConfig.isMobile ? 640 : 960 },
+            height: { ideal: deviceConfig.isMobile ? 480 : 720 }
           },
           audio: false
         });
@@ -493,7 +435,7 @@ export default function HairColorChanger() {
       }
       cancelAnimationFrame(animationFrameRef.current);
     };
-  }, []);
+  }, [deviceConfig]);
 
   useEffect(() => {
     if (isCameraOn) {
@@ -539,6 +481,9 @@ export default function HairColorChanger() {
               className="w-16 h-16 border-4 border-t-transparent border-purple-500 rounded-full mb-4"
             />
             <p className="text-white text-lg">در حال بارگزاری...</p>
+            <p className="text-gray-400 text-sm mt-2">
+              {deviceConfig.preferCPU ? 'حالت CPU (موبایل)' : 'حالت GPU (دسکتاپ)'}
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -600,6 +545,10 @@ export default function HairColorChanger() {
                     <li className="flex items-center gap-3">
                       <span className="text-purple-400">۳.</span>
                       <span>شدت رنگ را تنظیم کنید</span>
+                    </li>
+                    <li className="flex items-center gap-3 text-green-400">
+                      <span>✓</span>
+                      <span>بهبود کنتراست برای موهای تیره</span>
                     </li>
                     <li className="flex items-center gap-3 text-rose-400">
                       <span>تصویر شما ذخیره نمی‌شود</span>
@@ -893,6 +842,9 @@ export default function HairColorChanger() {
 
       <footer className="mt-6 text-gray-400 text-sm text-center pb-4">
         <p>تصویر و ویدیو شما به هیچ عنوان ذخیره نمی‌شود</p>
+        <p className="text-xs mt-1 text-purple-400">
+          {deviceConfig.preferCPU ? '⚡ بهینه موبایل' : '🚀 بهینه دسکتاپ'}
+        </p>
       </footer>
     </div>
   );
