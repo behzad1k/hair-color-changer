@@ -1,9 +1,298 @@
 'use client';
-import { COLOR_CATEGORIES, COLOR_PALETTE, HIGHLIGHT_COLORS } from '@/utils/constants';
 import { FilesetResolver, ImageSegmenter, ImageSegmenterOptions } from '@mediapipe/tasks-vision';
 import { useWindowSize } from '@react-hook/window-size';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
+
+const COLOR_CATEGORIES = [
+  {
+    slug: 'red',
+    title: 'قرمز و شرابی',
+    color: '#6f3140'
+  },
+  {
+    slug: 'brown',
+    title: 'قهوه ای مدرن',
+    color: '#2d2823'
+  },
+  {
+    slug: 'natural',
+    title: 'طبیعی',
+    color: '#28282e'
+  },
+  {
+    slug: 'quartz',
+    title: 'کوارتز',
+    color: '#281c1e'
+  },
+  {
+    slug: 'variation',
+    title: 'واریسیون',
+    color: '#a3a2a8'
+  },
+];
+
+const COLOR_PALETTE = [
+  {
+    category: 'red',
+    title: 'شرابی تیره',
+    color: '#231121',
+    lightVariant: '#4a2342',
+    darkVariant: '#150a13'
+  },
+  {
+    category: 'red',
+    title: 'شرابی',
+    color: '#2c1c27',
+    lightVariant: '#583848',
+    darkVariant: '#1c0e19'
+  },
+  {
+    category: 'red',
+    title: 'شرابی روشن',
+    color: '#3c1e3c',
+    lightVariant: '#6e3c6e',
+    darkVariant: '#2a122a'
+  },
+  {
+    category: 'red',
+    title: 'قرمز آلبالویی',
+    color: '#6f3140',
+    lightVariant: '#9e4660',
+    darkVariant: '#4a1f2b'
+  },
+  {
+    category: 'red',
+    title: 'قرمز آلبالویی روشن',
+    color: '#7c4650',
+    lightVariant: '#b26878',
+    darkVariant: '#562f38'
+  },
+  {
+    category: 'red',
+    title: 'قرمز آتشین',
+    color: '#42050b',
+    lightVariant: '#8a0a16',
+    darkVariant: '#2a0307'
+  },
+  {
+    category: 'red',
+    title: 'قرمز آتشین روشن',
+    color: '#50141e',
+    lightVariant: '#a0283c',
+    darkVariant: '#350d14'
+  },
+  {
+    category: 'brown',
+    title: 'شکلات تلخ',
+    color: '#2d2823',
+    lightVariant: '#5a5046',
+    darkVariant: '#1d1a16'
+  },
+  {
+    category: 'brown',
+    title: 'نوتلا',
+    color: '#5a463f',
+    lightVariant: '#8c6e5f',
+    darkVariant: '#3d2f2a'
+  },
+  {
+    category: 'brown',
+    title: 'کافه لاته',
+    color: '#a6826f',
+    lightVariant: '#d4b29f',
+    darkVariant: '#7a5e4f'
+  },
+  {
+    category: 'brown',
+    title: 'موکا',
+    color: '#463225',
+    lightVariant: '#6e4e3a',
+    darkVariant: '#2e2118'
+  },
+  {
+    category: 'brown',
+    title: 'آیس موکا',
+    color: '#b9a07d',
+    lightVariant: '#e5ccad',
+    darkVariant: '#8a7559'
+  },
+  {
+    category: 'brown',
+    title: 'هات چاکلت',
+    color: '#321e14',
+    lightVariant: '#643c28',
+    darkVariant: '#21130d'
+  },
+  {
+    category: 'brown',
+    title: 'مینک',
+    color: '#644b41',
+    lightVariant: '#967161',
+    darkVariant: '#44322b'
+  },
+  {
+    category: 'brown',
+    title: 'شکلات سفید',
+    color: '#debeaa',
+    lightVariant: '#f5e5d5',
+    darkVariant: '#b59e8a'
+  },
+  {
+    category: 'natural',
+    title: 'مشکی',
+    color: '#000000',
+    lightVariant: '#2a2a2a',
+    darkVariant: '#000000'
+  },
+  {
+    category: 'natural',
+    title: 'قهوه ای تیره',
+    color: '#28282e',
+    lightVariant: '#50505c',
+    darkVariant: '#1a1a1e'
+  },
+  {
+    category: 'natural',
+    title: 'قهوه ای خیلی تیره',
+    color: '#0d0a15',
+    lightVariant: '#1a142a',
+    darkVariant: '#05030a'
+  },
+  {
+    category: 'natural',
+    title: 'قهوه ای',
+    color: '#463a38',
+    lightVariant: '#6e5e5c',
+    darkVariant: '#2e2624'
+  },
+  {
+    category: 'natural',
+    title: 'قهوه ای روشن',
+    color: '#493c3c',
+    lightVariant: '#735e5e',
+    darkVariant: '#312828'
+  },
+  {
+    category: 'natural',
+    title: 'بلوند تیره',
+    color: '#4f3b32',
+    lightVariant: '#7a5b4c',
+    darkVariant: '#352721'
+  },
+  {
+    category: 'natural',
+    title: 'بلوند',
+    color: '#644632',
+    lightVariant: '#966a4c',
+    darkVariant: '#442f21'
+  },
+  {
+    category: 'natural',
+    title: 'بلوند روشن',
+    color: '#7d583b',
+    lightVariant: '#bc8459',
+    darkVariant: '#563c28'
+  },
+  {
+    category: 'natural',
+    title: 'بلوند خیلی روشن',
+    color: '#86643a',
+    lightVariant: '#c89658',
+    darkVariant: '#5e4528'
+  },
+  {
+    category: 'natural',
+    title: 'بلوند فوق روشن',
+    color: '#d8be91',
+    lightVariant: '#f5e5c9',
+    darkVariant: '#b39e73'
+  },
+  {
+    category: 'quartz',
+    title: 'کوارتز دودی',
+    color: '#281c1e',
+    lightVariant: '#50383c',
+    darkVariant: '#1a1214'
+  },
+  {
+    category: 'quartz',
+    title: 'کوارتز دودی روشن',
+    color: '#867072',
+    lightVariant: '#b6a0a2',
+    darkVariant: '#5e4e50'
+  },
+  {
+    category: 'quartz',
+    title: 'کوارتز دودی خیلی روشن',
+    color: '#b09793',
+    lightVariant: '#d8c7c3',
+    darkVariant: '#886f6b'
+  },
+  {
+    category: 'quartz',
+    title: 'کوارتز صورتی',
+    color: '#b68e8e',
+    lightVariant: '#d8b6b6',
+    darkVariant: '#8e6666'
+  },
+  {
+    category: 'quartz',
+    title: 'کوارتز صورتی روشن',
+    color: '#c6a0a0',
+    lightVariant: '#e6c8c8',
+    darkVariant: '#9e7878'
+  },
+  {
+    category: 'variation',
+    title: 'واریاسیون نقره ای',
+    color: '#a3a2a8',
+    lightVariant: '#d3d2d8',
+    darkVariant: '#73727a'
+  },
+  {
+    category: 'variation',
+    title: 'واریاسیون سبز',
+    color: '#3c5055',
+    lightVariant: '#5c7880',
+    darkVariant: '#28383b'
+  },
+];
+
+const HIGHLIGHT_COLORS = [
+  {
+    color: '#F5F5DC',
+    title: 'پلاتینیوم'
+  },
+  {
+    color: '#E6D3A3',
+    title: 'شامپاینی'
+  },
+  {
+    color: '#DEB887',
+    title: 'عسلی'
+  },
+  {
+    color: '#D2B48C',
+    title: 'کاراملی'
+  },
+  {
+    color: '#F0E68C',
+    title: 'طلایی روشن'
+  },
+  {
+    color: '#FFEFD5',
+    title: 'کرم'
+  },
+  {
+    color: '#FFE4B5',
+    title: 'موکاسین'
+  },
+  {
+    color: '#E6E6FA',
+    title: 'لاوندر'
+  }
+];
 
 export default function HairColorChanger() {
   const [width, height] = useWindowSize();
@@ -22,14 +311,8 @@ export default function HairColorChanger() {
   const highlightCacheRef = useRef<Float32Array | null>(null);
   const lastHighlightSettingsRef = useRef<string>('');
   const lastMaskHashRef = useRef<number>(0);
-
-  const hsvCacheRef = useRef<{
-    baseColor: any;
-    lightVariant: any;
-    darkVariant: any;
-    highlightColor: any;
-    colorKey: string;
-  } | null>(null);
+  const cachedHsvRef = useRef<{base: any, highlight: any} | null>(null);
+  const lastColorSettingsRef = useRef<string>('');
 
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [selectedColor, setSelectedColor] = useState(COLOR_PALETTE[7]);
@@ -49,8 +332,9 @@ export default function HairColorChanger() {
   useEffect(() => {
     highlightCacheRef.current = null;
     lastHighlightSettingsRef.current = '';
-    hsvCacheRef.current = null; // Add this line to clear HSV cache
-  }, [selectedColor, selectedHighlightColor, highlightMode, highlightIntensity, colorIntensity]);;
+    cachedHsvRef.current = null;
+    lastColorSettingsRef.current = '';
+  }, [selectedColor, selectedHighlightColor, highlightMode, highlightIntensity, colorIntensity]);
 
   const isMobileDevice = () => {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -79,11 +363,7 @@ export default function HairColorChanger() {
           break;
       }
     }
-    return {
-      h,
-      s,
-      v
-    };
+    return { h, s, v };
   };
 
   const hsvToRgb = (h: number, s: number, v: number) => {
@@ -95,42 +375,14 @@ export default function HairColorChanger() {
 
     let r = 0, g = 0, b = 0;
     switch (i % 6) {
-      case 0:
-        r = v;
-        g = t;
-        b = p;
-        break;
-      case 1:
-        r = q;
-        g = v;
-        b = p;
-        break;
-      case 2:
-        r = p;
-        g = v;
-        b = t;
-        break;
-      case 3:
-        r = p;
-        g = q;
-        b = v;
-        break;
-      case 4:
-        r = t;
-        g = p;
-        b = v;
-        break;
-      case 5:
-        r = v;
-        g = p;
-        b = q;
-        break;
+      case 0: r = v; g = t; b = p; break;
+      case 1: r = q; g = v; b = p; break;
+      case 2: r = p; g = v; b = t; break;
+      case 3: r = p; g = q; b = v; break;
+      case 4: r = t; g = p; b = v; break;
+      case 5: r = v; g = p; b = q; break;
     }
-    return {
-      r: r * 255,
-      g: g * 255,
-      b: b * 255
-    };
+    return { r: r * 255, g: g * 255, b: b * 255 };
   };
 
   const hexToRgb = (hex: string) => {
@@ -139,11 +391,7 @@ export default function HairColorChanger() {
       r: parseInt(result[1], 16),
       g: parseInt(result[2], 16),
       b: parseInt(result[3], 16)
-    } : {
-      r: 0,
-      g: 0,
-      b: 0
-    };
+    } : { r: 0, g: 0, b: 0 };
   };
 
   const hashMask = (maskData: Uint8Array, sampleRate: number = 200): number => {
@@ -173,11 +421,11 @@ export default function HairColorChanger() {
 
     const tempMask = new Float32Array(smoothMask);
     const radius = 4;
-    const sigma = 2.2;  // Changed to fixed value instead of radius / 1.8
-    const sigma2 = 2 * sigma * sigma;  // This becomes 2 * 2.2 * 2.2 = 9.68
+    const sigma = 2.2;
+    const sigma2 = 2 * sigma * sigma;
 
-    for (let y = radius; y < height - radius; y++) {
-      for (let x = radius; x < width - radius; x++) {
+    for (let y = radius; y < height - radius; y += 1) {
+      for (let x = radius; x < width - radius; x += 1) {
         const idx = y * width + x;
         if (tempMask[idx] > 0 ||
           tempMask[(y - 1) * width + x] > 0 ||
@@ -210,6 +458,7 @@ export default function HairColorChanger() {
 
     return smoothMask;
   };
+
   const generateOptimizedHighlights = (
     width: number,
     height: number,
@@ -228,10 +477,9 @@ export default function HairColorChanger() {
 
     const highlightMask = new Float32Array(width * height);
 
-    const samplePixelSize = 3
     let topY = height, bottomY = 0, leftX = width, rightX = 0;
-    for (let y = 0; y < height; y += samplePixelSize) {
-      for (let x = 0; x < width; x += samplePixelSize) {
+    for (let y = 0; y < height; y += 3) {
+      for (let x = 0; x < width; x += 3) {
         const idx = y * width + x;
         if (smoothMask[idx] > 0.3) {
           topY = Math.min(topY, y);
@@ -298,12 +546,8 @@ export default function HairColorChanger() {
     let maskData: Uint8Array | null = null;
 
     try {
-      const {
-        width,
-        height
-      } = ctx.canvas;
+      const { width, height } = ctx.canvas;
 
-      // Handle different mask formats
       if (mask instanceof Uint8Array) {
         maskData = mask;
       } else if (mask && typeof mask.getAsUint8Array === 'function') {
@@ -313,50 +557,38 @@ export default function HairColorChanger() {
         return;
       }
 
-      let hairPixelCount = 0;
+      if (!maskData) return
 
-      for (let i = 0; i < maskData.length; i++) {
+      let hairPixelCount = 0;
+      for (let i = 0; i < maskData.length; i += 10) {
         if (maskData[i] > 0) hairPixelCount++;
       }
 
       if (hairPixelCount === 0) {
-        console.warn('No hair detected in mask!');
         return;
       }
 
       const imageData = ctx.getImageData(0, 0, width, height);
       const data = imageData.data;
-      // Create a cache key based on current color selections
-      const colorKey = `${selectedColor.color}-${selectedColor.lightVariant}-${selectedColor.darkVariant}-${selectedHighlightColor.color}`;
 
-      // Check if we can reuse cached HSV conversions
-      let baseHsv, highlightHsv;
-      if (hsvCacheRef.current && hsvCacheRef.current.colorKey === colorKey) {
-        // Reuse cached conversions
-        baseHsv = hsvCacheRef.current.baseColor;
-        highlightHsv = hsvCacheRef.current.highlightColor;
-      } else {
-        // Calculate new conversions and cache them
+      const colorSettingsHash = `${selectedColor.color}-${selectedHighlightColor.color}`;
+      if (colorSettingsHash !== lastColorSettingsRef.current || !cachedHsvRef.current) {
         const baseColor = hexToRgb(selectedColor.color);
-        const lightVariant = hexToRgb(selectedColor.lightVariant);
-        const darkVariant = hexToRgb(selectedColor.darkVariant);
         const highlightColor = hexToRgb(selectedHighlightColor.color);
-
-        baseHsv = rgbToHsv(baseColor.r, baseColor.g, baseColor.b);
-        highlightHsv = rgbToHsv(highlightColor.r, highlightColor.g, highlightColor.b);
-
-        // Cache the results
-        hsvCacheRef.current = {
-          baseColor: baseHsv,
-          lightVariant: rgbToHsv(lightVariant.r, lightVariant.g, lightVariant.b),
-          darkVariant: rgbToHsv(darkVariant.r, darkVariant.g, darkVariant.b),
-          highlightColor: highlightHsv,
-          colorKey: colorKey
+        cachedHsvRef.current = {
+          base: rgbToHsv(baseColor.r, baseColor.g, baseColor.b),
+          highlight: rgbToHsv(highlightColor.r, highlightColor.g, highlightColor.b)
         };
+        lastColorSettingsRef.current = colorSettingsHash;
       }
+
+      const baseHsv = cachedHsvRef.current.base;
+      const highlightHsv = cachedHsvRef.current.highlight;
 
       const smoothMask = createOptimizedMask(maskData, width, height);
       const highlightMask = generateOptimizedHighlights(width, height, smoothMask, imageData);
+
+      const brightnessLiftFactor = colorIntensity * 0.7;
 
       for (let i = 0; i < width * height; i++) {
         const maskValue = smoothMask[i];
@@ -376,8 +608,6 @@ export default function HairColorChanger() {
         const targetBrightness = targetHsv.v;
 
         const brightnessDiff = targetBrightness - brightness;
-        const brightnessLiftFactor = colorIntensity * 0.7;
-
         const newBrightness = brightness + (brightnessDiff * brightnessLiftFactor);
 
         const isLightColorOnDarkHair = targetBrightness > 0.6 && brightness < 0.4;
@@ -397,12 +627,25 @@ export default function HairColorChanger() {
           ? highlightValue
           : maskValue * colorIntensity;
 
-        const preservationFactor = Math.max(0.5, 1 - (brightness * 0.25));
-        const finalIntensity = effectiveIntensity * preservationFactor;
+        // Enhanced preservation for thin strays and edges
+        const edgeFactor = maskValue < 0.3 ? Math.pow(maskValue / 0.3, 0.5) : 1;
+        const strayPreservation = Math.max(0.6, 1 - (brightness * 0.2));
+        const finalIntensity = effectiveIntensity * strayPreservation * edgeFactor;
 
-        data[pixelIdx] = newColor.r * finalIntensity + originalR * (1 - finalIntensity);
-        data[pixelIdx + 1] = newColor.g * finalIntensity + originalG * (1 - finalIntensity);
-        data[pixelIdx + 2] = newColor.b * finalIntensity + originalB * (1 - finalIntensity);
+        // Adaptive blending that preserves hair texture
+        const blendR = newColor.r * finalIntensity + originalR * (1 - finalIntensity);
+        const blendG = newColor.g * finalIntensity + originalG * (1 - finalIntensity);
+        const blendB = newColor.b * finalIntensity + originalB * (1 - finalIntensity);
+
+        // Add back some original texture to prevent washout
+        const textureFactor = 0.15;
+        const textureR = (blendR - originalR) * textureFactor;
+        const textureG = (blendG - originalG) * textureFactor;
+        const textureB = (blendB - originalB) * textureFactor;
+
+        data[pixelIdx] = Math.max(0, Math.min(255, blendR - textureR));
+        data[pixelIdx + 1] = Math.max(0, Math.min(255, blendG - textureG));
+        data[pixelIdx + 2] = Math.max(0, Math.min(255, blendB - textureB));
       }
 
       ctx.putImageData(imageData, 0, 0);
@@ -420,12 +663,14 @@ export default function HairColorChanger() {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
+
     const now = Date.now();
-    const targetFrameTime = isMobileDevice() ? 150 : 80;  // Changed from 100/66 to 150/80
+    const targetFrameTime = isMobileDevice() ? 150 : 80;
     if (now - lastProcessTimeRef.current < targetFrameTime) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
       return;
     }
+
     setIsProcessing(true);
     lastProcessTimeRef.current = now;
 
@@ -442,20 +687,9 @@ export default function HairColorChanger() {
 
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        const modelConfig = {
-          name: 'MediaPipe Hair (Float32)',
-          type: 'mediapipe',
-          url: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/hair_segmenter/float32/latest/hair_segmenter.tflite',
-          categoryMaskEnabled: true,
-          confidenceMaskEnabled: false,
-        };
-        let maskData = null;
-
-        if (modelConfig.type === 'mediapipe' || modelConfig.type === 'mediapipe-selfie') {
-          const segmentationResult = await hairSegmenterRef.current.segmentForVideo(video, now);
-          maskData = segmentationResult.categoryMask;
-          applyOptimizedHairColor(ctx, maskData);
-        }
+        const segmentationResult = await hairSegmenterRef.current.segmentForVideo(video, now);
+        const maskData = segmentationResult.categoryMask;
+        applyOptimizedHairColor(ctx, maskData);
       }
     } catch (err) {
       console.error('Error processing frame:', err);
@@ -480,7 +714,7 @@ export default function HairColorChanger() {
         const options: ImageSegmenterOptions = {
           baseOptions: {
             modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/hair_segmenter/float32/latest/hair_segmenter.tflite',
-            delegate: isMobileEnv ? 'CPU' : 'GPU'
+            delegate: 'CPU'
           },
           runningMode: 'VIDEO',
           outputCategoryMask: true,
@@ -489,7 +723,6 @@ export default function HairColorChanger() {
 
         const segmenter = await ImageSegmenter.createFromOptions(vision, options);
         hairSegmenterRef.current = segmenter;
-        console.log(`Initialized MediaPipe with ${isMobileEnv ? 'CPU' : 'GPU'} delegate`);
 
         setIsLoading(false);
 
@@ -498,7 +731,7 @@ export default function HairColorChanger() {
             facingMode: 'user',
             width: { ideal: 640 },
             height: { ideal: 480 },
-            frameRate: { ideal: 20, max: 20 }  // Add this line for mobile
+            frameRate: { ideal: 20 }
           },
           audio: false
         } : {
@@ -506,10 +739,11 @@ export default function HairColorChanger() {
             facingMode: 'user',
             width: { ideal: 1280 },
             height: { ideal: 720 },
-            frameRate: { ideal: 30, max: 30 }  // Add this line for desktop
+            frameRate: { ideal: 30 }
           },
           audio: false
         };
+
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
         if (videoRef.current) {
@@ -553,17 +787,10 @@ export default function HairColorChanger() {
     }
   }, [isCameraOn, processFrame]);
 
-  const ColorSwatch = ({
-                         colorObj,
-                         onClick,
-                         isSelected
-                       }: any) => (
+  const ColorSwatch = ({ colorObj, onClick, isSelected }: any) => (
     <div className="flex flex-col gap-2 items-center min-w-16">
       <motion.div
-        whileHover={{
-          scale: 1.1,
-          y: -3
-        }}
+        whileHover={{ scale: 1.1, y: -3 }}
         whileTap={{ scale: 0.9 }}
         onClick={onClick}
         className={`${isMobile ? 'w-10 h-10' : 'w-12 h-12'} rounded-full cursor-pointer shadow-lg transition-all duration-200 ${
@@ -587,11 +814,7 @@ export default function HairColorChanger() {
           >
             <motion.div
               animate={{ rotate: 360 }}
-              transition={{
-                repeat: Infinity,
-                duration: 1,
-                ease: 'linear'
-              }}
+              transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
               className="w-16 h-16 border-4 border-t-transparent border-purple-500 rounded-full mb-4"
             />
             <p className="text-white text-lg">در حال بارگزاری...</p>
@@ -602,18 +825,9 @@ export default function HairColorChanger() {
       <AnimatePresence>
         {error && (
           <motion.div
-            initial={{
-              y: -50,
-              opacity: 0
-            }}
-            animate={{
-              y: 0,
-              opacity: 1
-            }}
-            exit={{
-              y: -50,
-              opacity: 0
-            }}
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
             className="fixed top-4 left-4 right-4 mx-auto max-w-md bg-red-500/90 text-white px-4 py-3 rounded-lg shadow-lg z-40 text-center"
           >
             {error}
@@ -681,14 +895,8 @@ export default function HairColorChanger() {
 
         {isDesktop && showColorPalette && (
           <motion.div
-            initial={{
-              x: 50,
-              opacity: 0
-            }}
-            animate={{
-              x: 0,
-              opacity: 1
-            }}
+            initial={{ x: 50, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
             className="fixed right-4 top-1/2 transform -translate-y-1/2 w-96 bg-gradient-to-br from-gray-800/95 to-gray-900/95 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-purple-500/30 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex gap-2 mb-4">
@@ -727,15 +935,17 @@ export default function HairColorChanger() {
                 ) : (
                   <div>
                     <button onClick={() => setColorCat(null)} className="text-purple-400 mb-4">« بازگشت</button>
-                    <div className="grid grid-cols-3 gap-4">
-                      {COLOR_PALETTE.filter(c => c.category === colorCat.slug).map((colorObj, idx) => (
-                        <ColorSwatch
-                          key={idx}
-                          colorObj={colorObj}
-                          onClick={() => setSelectedColor(colorObj)}
-                          isSelected={selectedColor.color === colorObj.color}
-                        />
-                      ))}
+                    <div className="overflow-x-auto pb-4">
+                      <div className="flex gap-4 min-w-max">
+                        {COLOR_PALETTE.filter(c => c.category === colorCat.slug).map((colorObj, idx) => (
+                          <ColorSwatch
+                            key={idx}
+                            colorObj={colorObj}
+                            onClick={() => setSelectedColor(colorObj)}
+                            isSelected={selectedColor.color === colorObj.color}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -877,7 +1087,7 @@ export default function HairColorChanger() {
                   ) : (
                     <>
                       <button onClick={() => setColorCat(null)} className="text-purple-400 mb-3">« بازگشت</button>
-                      <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="flex max-w-screen p-4 overflow-x-auto overflow-y-hidden">
                         {COLOR_PALETTE.filter(c => c.category === colorCat.slug).map((colorObj, idx) => (
                           <ColorSwatch
                             key={idx}
