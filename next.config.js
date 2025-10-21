@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   experimental: {
     optimizePackageImports: [] // Disable if present
   }};
