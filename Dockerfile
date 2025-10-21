@@ -1,13 +1,20 @@
-# Use Node.js LTS version
-FROM node:18-alpine AS builder
+# Use Node.js LTS with Debian Bullseye instead of Alpine
+FROM node:18-bullseye AS builder
 
 # Set working directory
 WORKDIR /app
 
+# Install dependencies for native modules
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies for build (including TypeScript)
+# Install ALL dependencies for build
 RUN npm ci
 
 # Copy source code
@@ -17,21 +24,19 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine AS runner
+FROM node:18-bullseye-slim AS runner
 
 WORKDIR /app
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
+RUN groupadd -g 1001 -r nodejs && \
+    useradd -r -u 1001 -g nodejs nextjs
 
-# Copy only necessary files from builder stage
+# Copy built application from builder stage
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
 
 # Switch to non-root user
 USER nextjs
