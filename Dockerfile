@@ -7,7 +7,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install ALL dependencies for build (including TypeScript)
 RUN npm ci
 
 # Copy source code
@@ -19,31 +19,19 @@ RUN npm run build
 # Production stage
 FROM node:18-alpine AS runner
 
-# Install necessary packages for MediaPipe and other dependencies
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    cairo \
-    pango \
-    libjpeg-turbo \
-    giflib
-
 WORKDIR /app
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nextjs -u 1001
 
-# Copy built application from builder stage
-COPY --from=builder /app/next.config.js ./
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+# Copy only necessary files from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
-# Change ownership to non-root user
-RUN chown -R nextjs:nodejs /app
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
 
 # Switch to non-root user
 USER nextjs
