@@ -1,58 +1,59 @@
-FROM node:18-alpine AS base
+# Use Node.js LTS version
+FROM node:18-alpine AS builder
 
-# Install dependencies only when needed
-#FROM base AS deps
-#RUN apk add --no-cache libc6-compat
+# Set working directory
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json*
-RUN \ npm ci --include=dev; \
+# Copy package files
+COPY package*.json ./
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
 COPY . .
 
-# Build arguments for environment variables
-ARG NODE_ENV=production
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_WS_URL
-
-# Set environment variables for build
-ENV NODE_ENV=${NODE_ENV}
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
-ENV NEXT_TELEMETRY_DISABLED=1
-
+# Build the application
 RUN npm run build
 
-# Runner
-FROM base AS runner
+# Production stage
+FROM node:18-alpine AS runner
+
+# Install necessary packages for MediaPipe and other dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo \
+    pango \
+    libjpeg-turbo \
+    giflib
+
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
+# Copy built application from builder stage
+COPY --from=builder /app/next.config.js ./
 COPY --from=builder /app/public ./public
-
-# Critical Fix: Copy required node_modules
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 
-# Copy standalone files
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Change ownership to non-root user
+RUN chown -R nextjs:nodejs /app
 
+# Switch to non-root user
 USER nextjs
+
+# Expose port
 EXPOSE 3002
-ENV PORT 3002
-ENV HOSTNAME "0.0.0.0"
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3002', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-CMD ["node", "server.js"]
+# Start the application
+CMD ["npm", "start"]
