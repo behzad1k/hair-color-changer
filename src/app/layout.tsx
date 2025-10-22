@@ -4,7 +4,7 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
-  title: 'SeeDeep.Ai',
+  title: 'SeeDeep.ir',
   description: 'Real-time Hair Color Changer',
 };
 
