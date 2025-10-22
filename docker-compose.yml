@@ -12,6 +12,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3002
+      - HOSTNAME=0.0.0.0  # Add this line
     volumes:
       - ./logs:/app/logs
     healthcheck:

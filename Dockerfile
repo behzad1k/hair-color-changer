@@ -5,8 +5,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (this will work without package-lock.json)
-RUN npm install
+# Install dependencies
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -16,4 +16,5 @@ RUN npm run build
 
 EXPOSE 3002
 
-CMD ["npm", "start"]
+# Bind to 0.0.0.0 to allow external access
+CMD ["npm", "start", "--", "-H", "0.0.0.0", "-p", "3002"]
