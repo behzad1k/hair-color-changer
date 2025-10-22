@@ -5,14 +5,11 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with platform-specific binaries
-RUN npm ci
+# Install dependencies (this will work without package-lock.json)
+RUN npm install
 
 # Copy source code
 COPY . .
-
-# Rebuild native modules for the container's platform
-RUN npm rebuild
 
 # Build the application
 RUN npm run build
