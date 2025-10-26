@@ -9,8 +9,13 @@ services:
     restart: unless-stopped
     ports:
       - "3002:3002"
-    env_file:
-      - .env.fa
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - NEXT_PUBLIC_APP_LANGUAGE=fa
+      - NEXT_PUBLIC_APP_DESCRIPTION=Real-time Hair Color Changer
+      - NEXT_PUBLIC_APP_TITLE=SeeDeep.ir
+      - HOSTNAME=0.0.0.0
     volumes:
       - ./logs/en:/app/logs
     healthcheck:
