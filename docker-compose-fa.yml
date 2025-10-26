@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  hair-color-changer-fa:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hair-color-changer-fa
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    env_file:
+      - .env.primary
+    volumes:
+      - ./logs/en:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - hair-color-network
+
+networks:
+  hair-color-network:
+    driver: bridge

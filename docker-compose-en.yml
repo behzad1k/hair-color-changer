@@ -1,20 +1,18 @@
 version: '3.8'
 
 services:
-  hair-color-changer:
+  hair-color-changer-en:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hair-color-changer
+    container_name: hair-color-changer-en
     restart: unless-stopped
     ports:
-      - "3002:3002"
-    environment:
-      - NODE_ENV=production
-      - PORT=3002
-      - HOSTNAME=0.0.0.0  # Add this line
+      - "3006:3006"
+    env_file:
+      - .env.primary
     volumes:
-      - ./logs:/app/logs
+      - ./logs/en:/app/logs
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
@@ -27,7 +25,3 @@ services:
 networks:
   hair-color-network:
     driver: bridge
-
-volumes:
-  app-logs:
-    driver: local
