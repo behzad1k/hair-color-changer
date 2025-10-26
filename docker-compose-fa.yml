@@ -10,7 +10,7 @@ services:
     ports:
       - "3002:3002"
     env_file:
-      - .env.primary
+      - .env.fa
     volumes:
       - ./logs/en:/app/logs
     healthcheck:
