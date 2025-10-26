@@ -1,298 +1,10 @@
 'use client';
+import { COLOR_CATEGORIES, COLOR_PALETTE, HIGHLIGHT_COLORS } from '@/utils/constants';
+import dih, { language } from '@/lang/dictionary';
 import { FilesetResolver, ImageSegmenter, ImageSegmenterOptions } from '@mediapipe/tasks-vision';
 import { useWindowSize } from '@react-hook/window-size';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
-
-const COLOR_CATEGORIES = [
-  {
-    slug: 'red',
-    title: 'قرمز و شرابی',
-    color: '#6f3140'
-  },
-  {
-    slug: 'brown',
-    title: 'قهوه ای مدرن',
-    color: '#2d2823'
-  },
-  {
-    slug: 'natural',
-    title: 'طبیعی',
-    color: '#28282e'
-  },
-  {
-    slug: 'quartz',
-    title: 'کوارتز',
-    color: '#281c1e'
-  },
-  {
-    slug: 'variation',
-    title: 'واریسیون',
-    color: '#a3a2a8'
-  },
-];
-
-const COLOR_PALETTE = [
-  {
-    category: 'red',
-    title: 'شرابی تیره',
-    color: '#231121',
-    lightVariant: '#4a2342',
-    darkVariant: '#150a13'
-  },
-  {
-    category: 'red',
-    title: 'شرابی',
-    color: '#2c1c27',
-    lightVariant: '#583848',
-    darkVariant: '#1c0e19'
-  },
-  {
-    category: 'red',
-    title: 'شرابی روشن',
-    color: '#3c1e3c',
-    lightVariant: '#6e3c6e',
-    darkVariant: '#2a122a'
-  },
-  {
-    category: 'red',
-    title: 'قرمز آلبالویی',
-    color: '#6f3140',
-    lightVariant: '#9e4660',
-    darkVariant: '#4a1f2b'
-  },
-  {
-    category: 'red',
-    title: 'قرمز آلبالویی روشن',
-    color: '#7c4650',
-    lightVariant: '#b26878',
-    darkVariant: '#562f38'
-  },
-  {
-    category: 'red',
-    title: 'قرمز آتشین',
-    color: '#42050b',
-    lightVariant: '#8a0a16',
-    darkVariant: '#2a0307'
-  },
-  {
-    category: 'red',
-    title: 'قرمز آتشین روشن',
-    color: '#50141e',
-    lightVariant: '#a0283c',
-    darkVariant: '#350d14'
-  },
-  {
-    category: 'brown',
-    title: 'شکلات تلخ',
-    color: '#2d2823',
-    lightVariant: '#5a5046',
-    darkVariant: '#1d1a16'
-  },
-  {
-    category: 'brown',
-    title: 'نوتلا',
-    color: '#5a463f',
-    lightVariant: '#8c6e5f',
-    darkVariant: '#3d2f2a'
-  },
-  {
-    category: 'brown',
-    title: 'کافه لاته',
-    color: '#a6826f',
-    lightVariant: '#d4b29f',
-    darkVariant: '#7a5e4f'
-  },
-  {
-    category: 'brown',
-    title: 'موکا',
-    color: '#463225',
-    lightVariant: '#6e4e3a',
-    darkVariant: '#2e2118'
-  },
-  {
-    category: 'brown',
-    title: 'آیس موکا',
-    color: '#b9a07d',
-    lightVariant: '#e5ccad',
-    darkVariant: '#8a7559'
-  },
-  {
-    category: 'brown',
-    title: 'هات چاکلت',
-    color: '#321e14',
-    lightVariant: '#643c28',
-    darkVariant: '#21130d'
-  },
-  {
-    category: 'brown',
-    title: 'مینک',
-    color: '#644b41',
-    lightVariant: '#967161',
-    darkVariant: '#44322b'
-  },
-  {
-    category: 'brown',
-    title: 'شکلات سفید',
-    color: '#debeaa',
-    lightVariant: '#f5e5d5',
-    darkVariant: '#b59e8a'
-  },
-  {
-    category: 'natural',
-    title: 'مشکی',
-    color: '#000000',
-    lightVariant: '#2a2a2a',
-    darkVariant: '#000000'
-  },
-  {
-    category: 'natural',
-    title: 'قهوه ای تیره',
-    color: '#28282e',
-    lightVariant: '#50505c',
-    darkVariant: '#1a1a1e'
-  },
-  {
-    category: 'natural',
-    title: 'قهوه ای خیلی تیره',
-    color: '#0d0a15',
-    lightVariant: '#1a142a',
-    darkVariant: '#05030a'
-  },
-  {
-    category: 'natural',
-    title: 'قهوه ای',
-    color: '#463a38',
-    lightVariant: '#6e5e5c',
-    darkVariant: '#2e2624'
-  },
-  {
-    category: 'natural',
-    title: 'قهوه ای روشن',
-    color: '#493c3c',
-    lightVariant: '#735e5e',
-    darkVariant: '#312828'
-  },
-  {
-    category: 'natural',
-    title: 'بلوند تیره',
-    color: '#4f3b32',
-    lightVariant: '#7a5b4c',
-    darkVariant: '#352721'
-  },
-  {
-    category: 'natural',
-    title: 'بلوند',
-    color: '#644632',
-    lightVariant: '#966a4c',
-    darkVariant: '#442f21'
-  },
-  {
-    category: 'natural',
-    title: 'بلوند روشن',
-    color: '#7d583b',
-    lightVariant: '#bc8459',
-    darkVariant: '#563c28'
-  },
-  {
-    category: 'natural',
-    title: 'بلوند خیلی روشن',
-    color: '#86643a',
-    lightVariant: '#c89658',
-    darkVariant: '#5e4528'
-  },
-  {
-    category: 'natural',
-    title: 'بلوند فوق روشن',
-    color: '#d8be91',
-    lightVariant: '#f5e5c9',
-    darkVariant: '#b39e73'
-  },
-  {
-    category: 'quartz',
-    title: 'کوارتز دودی',
-    color: '#281c1e',
-    lightVariant: '#50383c',
-    darkVariant: '#1a1214'
-  },
-  {
-    category: 'quartz',
-    title: 'کوارتز دودی روشن',
-    color: '#867072',
-    lightVariant: '#b6a0a2',
-    darkVariant: '#5e4e50'
-  },
-  {
-    category: 'quartz',
-    title: 'کوارتز دودی خیلی روشن',
-    color: '#b09793',
-    lightVariant: '#d8c7c3',
-    darkVariant: '#886f6b'
-  },
-  {
-    category: 'quartz',
-    title: 'کوارتز صورتی',
-    color: '#b68e8e',
-    lightVariant: '#d8b6b6',
-    darkVariant: '#8e6666'
-  },
-  {
-    category: 'quartz',
-    title: 'کوارتز صورتی روشن',
-    color: '#c6a0a0',
-    lightVariant: '#e6c8c8',
-    darkVariant: '#9e7878'
-  },
-  {
-    category: 'variation',
-    title: 'واریاسیون نقره ای',
-    color: '#a3a2a8',
-    lightVariant: '#d3d2d8',
-    darkVariant: '#73727a'
-  },
-  {
-    category: 'variation',
-    title: 'واریاسیون سبز',
-    color: '#3c5055',
-    lightVariant: '#5c7880',
-    darkVariant: '#28383b'
-  },
-];
-
-const HIGHLIGHT_COLORS = [
-  {
-    color: '#F5F5DC',
-    title: 'پلاتینیوم'
-  },
-  {
-    color: '#E6D3A3',
-    title: 'شامپاینی'
-  },
-  {
-    color: '#DEB887',
-    title: 'عسلی'
-  },
-  {
-    color: '#D2B48C',
-    title: 'کاراملی'
-  },
-  {
-    color: '#F0E68C',
-    title: 'طلایی روشن'
-  },
-  {
-    color: '#FFEFD5',
-    title: 'کرم'
-  },
-  {
-    color: '#FFE4B5',
-    title: 'موکاسین'
-  },
-  {
-    color: '#E6E6FA',
-    title: 'لاوندر'
-  }
-];
 
 export default function HairColorChanger() {
   const [width, height] = useWindowSize();
@@ -541,7 +253,6 @@ export default function HairColorChanger() {
     highlightCacheRef.current = highlightMask;
     return highlightMask;
   };
-
   const applyOptimizedHairColor = useCallback((ctx: CanvasRenderingContext2D, mask: any) => {
     let maskData: Uint8Array | null = null;
 
@@ -817,7 +528,7 @@ export default function HairColorChanger() {
               transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
               className="w-16 h-16 border-4 border-t-transparent border-purple-500 rounded-full mb-4"
             />
-            <p className="text-white text-lg">در حال بارگزاری...</p>
+            <p className="text-white text-lg">{dih.loading}</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -835,17 +546,17 @@ export default function HairColorChanger() {
         )}
       </AnimatePresence>
 
-      <header className="w-full max-w-7xl py-4 z-10 px-4">
-        <h1 className={`font-sans text-center text-white bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent ${
+      <header className="w-full max-w-7xl p-4 z-10">
+        <h1 className={`text-center text-white bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text ${
           isMobile ? 'text-xl' : isTablet ? 'text-3xl' : 'text-4xl'
         }`}>
-          رنگ مو مجازی با هوش مصنوعی
+          {dih.title}
         </h1>
       </header>
 
       <div className="flex flex-col items-center justify-center w-full flex-1">
         <div className={`relative ${
-          isMobile ? 'w-full aspect-[9/16]' : isTablet ? 'w-10/12 aspect-[3/4]' : 'w-8/12 aspect-video'
+          isMobile ? 'w-full aspect-[9/16] flex-1 h-full' : isTablet ? 'w-10/12 aspect-[3/4]' : 'w-8/12 aspect-video'
         } rounded-xl overflow-hidden bg-gray-800 shadow-2xl border border-purple-500/30`}>
           <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover opacity-0" playsInline muted/>
           <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover"/>
@@ -866,26 +577,26 @@ export default function HairColorChanger() {
                 }}
               >
                 <div className="bg-gradient-to-br from-gray-800/95 to-gray-900/95 border border-purple-500/50 rounded-xl p-6 max-w-md text-center">
-                  <h3 className="text-white text-xl mb-4">نحوه استفاده</h3>
+                  <h3 className="text-white text-xl mb-4">{dih.howToUse}</h3>
                   <ul className="space-y-3 text-sm mb-6 text-gray-200 text-right">
                     <li className="flex items-center gap-3">
-                      <span className="text-purple-400">۱.</span>
-                      <span>اجازه دسترسی به دوربین را بدهید</span>
+                      <span className="text-purple-400">1.</span>
+                      <span>{dih.allowCamera}</span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <span className="text-purple-400">۲.</span>
-                      <span>رنگ پایه یا هایلایت انتخاب کنید</span>
+                      <span className="text-purple-400">2.</span>
+                      <span>{dih.pickColorOrHighlight}</span>
                     </li>
                     <li className="flex items-center gap-3">
                       <span className="text-purple-400">۳.</span>
-                      <span>شدت رنگ را تنظیم کنید</span>
+                      <span>{dih.selectColorIntensity}</span>
                     </li>
                     <li className="flex items-center gap-3 text-rose-400">
-                      <span>تصویر شما ذخیره نمی‌شود</span>
+                      <span>{dih.yourPicWontBeSaved}</span>
                     </li>
                   </ul>
                   <button className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-lg font-medium">
-                    شروع
+                    {dih.start}
                   </button>
                 </div>
               </motion.div>
@@ -897,13 +608,13 @@ export default function HairColorChanger() {
           <motion.div
             initial={{ x: 50, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            className="fixed right-4 top-1/2 transform -translate-y-1/2 w-96 bg-gradient-to-br from-gray-800/95 to-gray-900/95 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-purple-500/30 max-h-[90vh] overflow-y-auto"
+            className="fixed right-4 top-1/2 transform -translate-y-1/2 w-96 bg-gradient-to-br from-transparent to-gray-900/95 backdrop-blur-md rounded-2xl p-6 shadow-2xl border border-purple-500/30 max-h-[90vh] overflow-y-auto"
           >
             {activeTab === 'color' && (
               <>
                 {!colorCat ? (
                   <div>
-                    <h3 className="text-white text-lg mb-4 text-center">دسته‌بندی رنگ‌ها</h3>
+                    <h3 className="text-white text-lg mb-4 text-center">{dih.colorCategories}</h3>
                     <div className="grid grid-cols-3 gap-4">
                       {COLOR_CATEGORIES.map((cat) => (
                         <div key={cat.slug} className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => setColorCat(cat)}>
@@ -915,7 +626,7 @@ export default function HairColorChanger() {
                   </div>
                 ) : (
                   <div>
-                    <button onClick={() => setColorCat(null)} className="text-purple-400 mb-4">« بازگشت</button>
+                    <button onClick={() => setColorCat(null)} className="text-purple-400 mb-4">{dih.return}</button>
                     <div className="overflow-x-auto pb-4">
                       <div className="flex gap-4 min-w-max">
                         {COLOR_PALETTE.filter(c => c.category === colorCat.slug).map((colorObj, idx) => (
@@ -961,7 +672,7 @@ export default function HairColorChanger() {
                       animate={{ x: highlightMode ? 24 : 2 }}
                     />
                   </button>
-                  <span className="text-gray-300 text-sm">فعال</span>
+                  <span className="text-gray-300 text-sm">{dih.active}</span>
                 </div>
 
                 {highlightMode && (
@@ -984,7 +695,7 @@ export default function HairColorChanger() {
                     </div>
 
                     <div>
-                      <label className="text-white text-sm mb-2 block text-right">شدت هایلایت: {Math.round(highlightIntensity * 100)}%</label>
+                      <label className="text-white text-sm mb-2 block text-right">{dih.highlightIntensity}{Math.round(highlightIntensity * 100)}%</label>
                       <input
                         type="range"
                         min="0.2"
@@ -1021,54 +732,68 @@ export default function HairColorChanger() {
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            className="fixed bottom-0 left-0 right-0 bg-gradient-to-br from-gray-800/98 to-gray-900/98 backdrop-blur-md rounded-t-2xl shadow-2xl z-30 max-h-[70vh] overflow-y-auto"
+            className="fixed bottom-0 left-0 right-0 pt-5 bg-transparent backdrop-blur-md rounded-t-2xl shadow-2xl z-30 max-h-[70vh] overflow-y-auto"
           >
-            <div className="p-4">
-              <div className="flex justify-center mb-2">
-                <div className="w-12 h-1 bg-gray-400 rounded-full"/>
-              </div>
-
+            <div className="flex justify-center">
+              <div className="w-12 h-1 bg-gray-400 rounded-full"/>
+            </div>
+            <div className="p-4 pt-5">
               <button
                 onClick={() => setShowColorPalette(false)}
-                className="absolute left-4 top-4 bg-orange-500 w-8 h-8 flex items-center justify-center rounded-full text-white"
+                className="absolute right-3 top-3 bg-orange-500 w-8 h-8 flex items-center justify-center rounded-full text-white"
               >
                 ✕
               </button>
 
-              <div className="flex gap-2 mb-4 mt-4">
-                <button
-                  onClick={() => setActiveTab('color')}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm ${
-                    activeTab === 'color' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
-                  }`}
-                >
-                  رنگ پایه
-                </button>
-                <button
-                  onClick={() => setActiveTab('highlights')}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm ${
-                    activeTab === 'highlights' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'
-                  }`}
-                >
-                  هایلایت
-                </button>
-              </div>
+              {/* <div className="flex gap-2 mb-4 mt-4"> */}
+              {/*   <button */}
+              {/*     onClick={() => setActiveTab('color')} */}
+              {/*     className={`flex-1 px-4 py-2 rounded-lg text-sm ${ */}
+              {/*       activeTab === 'color' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300' */}
+              {/*     }`} */}
+              {/*   > */}
+              {/*     {dih.baseColor} */}
+              {/*   </button> */}
+              {/*   <button */}
+              {/*     onClick={() => setActiveTab('highlights')} */}
+              {/*     className={`flex-1 px-4 py-2 rounded-lg text-sm ${ */}
+              {/*       activeTab === 'highlights' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300' */}
+              {/*     }`} */}
+              {/*   > */}
+              {/*     {dih.highlight} */}
+              {/*   </button> */}
+              {/* </div> */}
 
               {activeTab === 'color' && (
                 <>
                   {!colorCat ? (
-                    <div className="grid grid-cols-3 gap-3">
-                      {COLOR_CATEGORIES.map((cat) => (
-                        <div key={cat.slug} className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => setColorCat(cat)}>
-                          <div className="w-16 h-16 rounded-full" style={{ backgroundColor: cat.color }}/>
-                          <span className="text-white text-xs text-center">{cat.title}</span>
-                        </div>
-                      ))}
-                    </div>
+                    // <div className="grid grid-cols-3 gap-3">
+                    //   {COLOR_CATEGORIES.map((cat) => (
+                    //     <div key={cat.slug} className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => setColorCat(cat)}>
+                    //       <div className="w-16 h-16 rounded-full" style={{ backgroundColor: cat.color }}/>
+                    //       <span className="text-white text-xs text-center">{cat.title}</span>
+                    //     </div>
+                    //   ))}
+                    // </div>
+                      <div className="flex max-w-screen p-1 gap-1 overflow-x-auto overflow-y-hidden">
+                        {COLOR_CATEGORIES.map((colorObj, idx) => (
+                          <ColorSwatch
+                            key={idx}
+                            colorObj={colorObj}
+                            onClick={() => setColorCat(colorObj)}
+                            isSelected={colorCat?.color === colorObj.color}
+                          />
+                        ))}
+                      </div>
                   ) : (
                     <>
-                      <button onClick={() => setColorCat(null)} className="text-purple-400 mb-3">« بازگشت</button>
-                      <div className="flex max-w-screen p-4 overflow-x-auto overflow-y-hidden">
+                      <button
+                        onClick={() => setColorCat(null)}
+                        className="absolute left-3 top-3 bg-gray-500 w-16 h-8 flex items-center justify-center rounded-full text-white text-sm"
+                      >
+                        {dih.return}
+                      </button>
+                      <div className="flex max-w-screen p-1 overflow-x-auto overflow-y-hidden">
                         {COLOR_PALETTE.filter(c => c.category === colorCat.slug).map((colorObj, idx) => (
                           <ColorSwatch
                             key={idx}
@@ -1082,14 +807,15 @@ export default function HairColorChanger() {
                   )}
 
                   <div className="space-y-3 mt-4">
-                    <div>
-                      <label className="text-white text-sm mb-2 block text-right">شدت رنگ: {Math.round(colorIntensity * 100)}%</label>
+                    <div className='flex justify-between'>
+                      <label className="text-white text-sm w-2/5">{dih.colorIntensity} {Math.round(colorIntensity * 100)}%</label>
                       <input
                         type="range"
                         min="0.3"
                         max="1"
                         step="0.05"
                         value={colorIntensity}
+                        dir='ltr'
                         onChange={(e) => setColorIntensity(parseFloat(e.target.value))}
                         className="w-full"
                       />
@@ -1101,7 +827,7 @@ export default function HairColorChanger() {
               {activeTab === 'highlights' && (
                 <div>
                   <div className="flex items-center justify-center gap-3 mb-4">
-                    <span className="text-gray-300 text-sm">غیرفعال</span>
+                    <span className="text-gray-300 text-sm">{dih.inactive}</span>
                     <button
                       onClick={() => setHighlightMode(!highlightMode)}
                       className={`relative w-12 h-6 rounded-full transition ${highlightMode ? 'bg-purple-600' : 'bg-gray-600'}`}
@@ -1111,7 +837,7 @@ export default function HairColorChanger() {
                         animate={{ x: highlightMode ? 24 : 2 }}
                       />
                     </button>
-                    <span className="text-gray-300 text-sm">فعال</span>
+                    <span className="text-gray-300 text-sm">{dih.active}</span>
                   </div>
 
                   {highlightMode && (
@@ -1134,7 +860,7 @@ export default function HairColorChanger() {
                       </div>
 
                       <div>
-                        <label className="text-white text-sm mb-2 block text-right">شدت هایلایت: {Math.round(highlightIntensity * 100)}%</label>
+                        <label className="text-white text-sm mb-2 block text-right">{dih.highlightIntensity}{Math.round(highlightIntensity * 100)}%</label>
                         <input
                           type="range"
                           min="0.2"
@@ -1154,9 +880,9 @@ export default function HairColorChanger() {
         )}
       </AnimatePresence>
 
-      <footer className="mt-6 text-gray-400 text-sm text-center pb-4">
-        <p>تصویر و ویدیو شما به هیچ عنوان ذخیره نمی‌شود</p>
-      </footer>
+      {/* <footer className="mt-6 text-gray-400 text-sm text-center pb-4"> */}
+      {/*   <p>{dih.yourPicWontBeSaved</p> */}
+      {/* </footer> */}
     </div>
   );
 }

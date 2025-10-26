@@ -1,11 +1,12 @@
+import { isRTL, language } from '@/lang/dictionary';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
-  title: 'SeeDeep.ir',
-  description: 'Real-time Hair Color Changer',
+  title: process.env.NEXT_PUBLIC_APP_TITLE,
+  description: process.env.NEXT_PUBLIC_APP_DESCRIPTION,
 };
 
 export default function RootLayout({
@@ -14,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang={language} dir={isRTL ? 'rtl' : 'ltr'}>
     <body className={inter.className}>{children}</body>
     </html>
   );
