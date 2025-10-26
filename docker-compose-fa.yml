@@ -17,7 +17,7 @@ services:
       - NEXT_PUBLIC_APP_TITLE=SeeDeep.ir
       - HOSTNAME=0.0.0.0
     volumes:
-      - ./logs/en:/app/logs
+      - ./logs/fa:/app/logs
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
