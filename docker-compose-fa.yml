@@ -5,6 +5,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_LANGUAGE: fa
+        NEXT_PUBLIC_APP_DESCRIPTION: Real-time Hair Color Changer
+        NEXT_PUBLIC_APP_TITLE: SeeDeep.ir
     container_name: hair-color-changer-fa
     restart: unless-stopped
     ports:
@@ -12,9 +16,6 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3002
-      - NEXT_PUBLIC_APP_LANGUAGE=fa
-      - NEXT_PUBLIC_APP_DESCRIPTION=Real-time Hair Color Changer
-      - NEXT_PUBLIC_APP_TITLE=SeeDeep.ir
       - HOSTNAME=0.0.0.0
     volumes:
       - ./logs/fa:/app/logs

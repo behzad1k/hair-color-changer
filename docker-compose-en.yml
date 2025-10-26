@@ -5,17 +5,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_LANGUAGE: en
+        NEXT_PUBLIC_APP_DESCRIPTION: Real-time Hair Color Changer
+        NEXT_PUBLIC_APP_TITLE: SeeDeep.ai
     container_name: hair-color-changer-en
     restart: unless-stopped
     ports:
       - "3006:3006"
     environment:
-	    - NODE_ENV=production
-	    - PORT=3006
-	    - NEXT_PUBLIC_APP_LANGUAGE=en
-	    - NEXT_PUBLIC_APP_DESCRIPTION=Real-time Hair Color Changer
-	    - NEXT_PUBLIC_APP_TITLE=SeeDeep.ai
-	    - HOSTNAME=0.0.0.0
+      - NODE_ENV=production
+      - PORT=3006
+      - HOSTNAME=0.0.0.0
     volumes:
       - ./logs/en:/app/logs
     healthcheck:
