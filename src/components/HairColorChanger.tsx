@@ -588,7 +588,7 @@ export default function HairColorChanger() {
                       <span>{dih.pickColorOrHighlight}</span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <span className="text-purple-400">۳.</span>
+                      <span className="text-purple-400">3.</span>
                       <span>{dih.selectColorIntensity}</span>
                     </li>
                     <li className="flex items-center gap-3 text-rose-400">
